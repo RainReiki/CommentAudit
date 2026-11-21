@@ -21,6 +21,7 @@ $tabs = [
     'overview' => _t('概览'),
     'reputation' => _t('信誉管理'),
     'logs' => _t('审核日志'),
+    'history' => _t('历史扫描'),
     'advanced' => _t('高级设置'),
 ];
 $tab = $request->get('tab', 'overview');
@@ -62,6 +63,7 @@ require $adminPath . '/menu.php';
                         'overview' => _t('查看评论审核统计、运行状态和最近决策。'),
                         'reputation' => _t('查找访客信誉，设置白名单或恢复自动评级。'),
                         'logs' => _t('筛选历史审核记录并查看判定详情。'),
+                        'history' => _t('用当前规则检查站内已有的评论，找出需要复核的内容。'),
                         'advanced' => _t('管理评论列表增强、日志保留和 AI 缓存。'),
                     ];
                     echo $h($intro[$tab]);
@@ -170,7 +172,9 @@ require $adminPath . '/menu.php';
                     fetch(url, {method: 'POST', credentials: 'same-origin'})
                         .then(function (response) { return response.json(); })
                         .then(function (data) {
-                            result.textContent = data && data.success ? <?php echo json_encode(_t('连接正常'), JSON_HEX_TAG); ?> : <?php echo json_encode(_t('连接失败，请检查设置'), JSON_HEX_TAG); ?>;
+                            result.textContent = data && data.success
+                                ? <?php echo json_encode(_t('连接正常'), JSON_HEX_TAG); ?>
+                                : (data && data.message) || <?php echo json_encode(_t('连接失败，请检查设置'), JSON_HEX_TAG); ?>;
                             button.disabled = false;
                         })
                         .catch(function () {
@@ -457,6 +461,8 @@ require $adminPath . '/menu.php';
             })();
             </script>
 
+        <?php elseif ($tab === 'history'): ?>
+            <?php require __DIR__ . '/Admin/history-panel.php'; ?>
         <?php elseif ($tab === 'advanced'): ?>
             <form method="post" action="<?php echo $h($actionUrl('save-advanced')); ?>">
                 <div class="commentaudit-grid">

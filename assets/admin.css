@@ -113,17 +113,13 @@ html:has(#darkcss:not([disabled])) :is(.commentaudit-scope, .commentaudit-enhanc
 .commentaudit-scope :is(.commentaudit-desc, .commentaudit-muted, .description) { color: var(--ca-muted); }
 .commentaudit-config :is(.commentaudit-config-card, .commentaudit-config-tabs)[hidden] { display: none; }
 .commentaudit-config-footer { display: grid; gap: 10px; margin-bottom: 14px; }
-.commentaudit-config-footer > a { justify-self: start; color: var(--ca-accent); padding: 4px 0; }
+.commentaudit-config-links { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.commentaudit-config-links a { color: var(--ca-accent); padding: 4px 0; }
 .commentaudit-config-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
 .commentaudit-config .commentaudit-config-tabs [aria-selected="true"] {
     border-color: var(--ca-accent);
     background: var(--ca-accent);
     color: var(--ca-on-accent);
-}
-.commentaudit-config .commentaudit-key-configured input::placeholder {
-    color: var(--ca-text);
-    letter-spacing: .16em;
-    opacity: 1;
 }
 .commentaudit-config-grid, .commentaudit-grid, .commentaudit-grid-3 {
     display: grid;
@@ -183,6 +179,57 @@ html:has(#darkcss:not([disabled])) :is(.commentaudit-scope, .commentaudit-enhanc
 .commentaudit-stat { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 100px), 1fr)); gap: 10px; }
 .commentaudit-stat div { padding: 10px; border: 1px solid var(--ca-border); border-radius: 8px; background: var(--ca-soft-bg); }
 .commentaudit-stat strong { display: block; color: var(--ca-accent); font-size: 24px; }
+
+.commentaudit-scan [hidden] { display: none; }
+.commentaudit-scan-form .commentaudit-scan-note { margin: 12px 0 0; }
+.commentaudit-scan-status:not(:empty) { margin-top: 12px; color: var(--ca-accent); font-weight: 600; }
+.commentaudit-scan-results-head, .commentaudit-scan-result header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+}
+.commentaudit-scan-result {
+    padding: 12px 0;
+    border-top: 1px solid var(--ca-border);
+}
+.commentaudit-scan-result p { margin: 6px 0; white-space: pre-wrap; }
+.commentaudit-scan-result a { display: block; width: fit-content; margin-top: 4px; color: var(--ca-accent); }
+.commentaudit-scan-toolbar { margin: 12px 0; padding: 10px; border-radius: 8px; background: var(--ca-soft-bg); }
+.commentaudit-scan-toolbar .commentaudit-actions:first-child { margin-top: 0; }
+.commentaudit-scope .commentaudit-scan select[data-scan-single] { width: auto; }
+.commentaudit-scan-menu { position: relative; width: fit-content; margin-top: 8px; }
+.commentaudit-scan-menu summary { gap: 6px; cursor: pointer; }
+.commentaudit-scan-menu summary[aria-disabled="true"] { opacity: .55; cursor: default; }
+.commentaudit-scan-menu ul {
+    position: absolute;
+    z-index: 2;
+    inset-inline-start: 0;
+    min-width: 130px;
+    margin: 4px 0 0;
+    padding: 4px;
+    list-style: none;
+    border: 1px solid var(--ca-border);
+    border-radius: 8px;
+    background: var(--ca-bg);
+    box-shadow: var(--ca-shadow);
+}
+.commentaudit-scan-menu button {
+    width: 100%;
+    min-height: 40px;
+    padding: 5px 10px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--ca-text);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+}
+.commentaudit-scan-menu button:hover, .commentaudit-scan-menu button:focus-visible { background: var(--ca-soft-bg); }
+.commentaudit-scan-menu [data-scan-bulk-action="delete"] { font-weight: 700; }
+.commentaudit-scan [data-scan-moderation-status]:empty { display: none; }
 
 .commentaudit-scope .commentaudit-modal {
     position: fixed;

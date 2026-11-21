@@ -27,12 +27,12 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  *
  * @package CommentAudit
  * @author 羽忆
- * @version 1.0.7
+ * @version 1.0.15
  * @link https://lizihao.com/
  */
 class Plugin implements PluginInterface
 {
-    public const VERSION = '1.0.7';
+    public const VERSION = '1.0.15';
     public const PLUGIN_NAME = 'CommentAudit';
 
     /**
@@ -99,6 +99,10 @@ class Plugin implements PluginInterface
     public static function configHandle(array $settings, bool $isInit): void
     {
         if (!$isInit) {
+            // Typecho's form reader treats an empty string as a missing value.
+            if (($_POST['deepseekApiKey'] ?? null) === '') {
+                $settings['deepseekApiKey'] = '';
+            }
             Helper::configPlugin(self::PLUGIN_NAME, SettingsForm::merge(self::settings(), $settings));
         }
     }

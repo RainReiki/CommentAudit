@@ -32,7 +32,8 @@ class Action extends Base implements ActionInterface
 
         $do = (string) $this->request->get('do', '');
 
-        if (in_array($do, ['save-advanced', 'clear-cache', 'set-trust', 'blacklist'], true) && !$this->request->isPost()) {
+        if (in_array($do, ['save-advanced', 'clear-cache', 'set-trust', 'blacklist', 'history-scan', 'history-moderate'], true)
+            && !$this->request->isPost()) {
             $this->response->setStatus(405);
             return;
         }
@@ -50,6 +51,12 @@ class Action extends Base implements ActionInterface
             case 'audit-info':
                 $this->auditInfo();
                 break;
+            case 'history-scan':
+                $this->scanHistory();
+                break;
+            case 'history-moderate':
+                $this->moderateHistory();
+                break;
             case 'blacklist':
                 $this->blacklist();
                 break;
@@ -62,6 +69,60 @@ class Action extends Base implements ActionInterface
             default:
                 $this->back('overview');
         }
+    }
+
+    private function scanHistory(): void
+    {
+        $scope = $this->request->get('scope', 'approved');
+        $withAi = $this->request->get('mode') === 'ai';
+        $range = ['options' => ['min_range' => 0]];
+        $after = filter_var($this->request->get('after', '0'), FILTER_VALIDATE_INT, $range);
+        $upper = $this->request->get('through');
+        $through = $upper === null ? null : filter_var($upper, FILTER_VALIDATE_INT, $range);
+
+        if (!in_array($scope, HistoryScan::SCOPES, true) || $after === false || $through === false
+            || ($through === null ? $after !== 0 : $after > $through)) {
+            $this->response->throwJson(['success' => false, 'message' => _t('扫描范围无效，请重新开始。')]);
+            return;
+        }
+
+        $settings = Plugin::settings();
+        if ($withAi && trim((string) $settings['deepseekApiKey']) === '') {
+            $this->response->throwJson(['success' => false, 'message' => _t('请先配置 DeepSeek 密钥，或选择仅用本地规则。')]);
+            return;
+        }
+
+        try {
+            $batch = HistoryScan::batch($scope, $withAi, $after, $through, $settings);
+        } catch (\Throwable $e) {
+            error_log('[CommentAudit] Historical scan failed: ' . get_class($e));
+            $this->response->throwJson(['success' => false, 'message' => _t('扫描失败。可以继续重试当前批次。')]);
+            return;
+        }
+
+        $this->response->throwJson(['success' => true] + $batch);
+    }
+
+    private function moderateHistory(): void
+    {
+        $raw = $this->request->get('changes');
+        $changes = is_string($raw) ? json_decode($raw, true, 4) : null;
+        if (!is_array($changes) || !$changes || count($changes) > HistoryModeration::BATCH_SIZE) {
+            $this->response->throwJson(['success' => false, 'message' => _t('请选择有效的评论后重试。')]);
+            return;
+        }
+
+        try {
+            $results = HistoryModeration::apply($changes);
+        } catch (\InvalidArgumentException $e) {
+            $this->response->throwJson(['success' => false, 'message' => _t('评论状态或操作无效，请重新扫描。')]);
+            return;
+        } catch (\Throwable $e) {
+            error_log('[CommentAudit] Historical moderation failed: ' . get_class($e));
+            $this->response->throwJson(['success' => false, 'message' => _t('无法确认本批处理结果，请重试。')]);
+            return;
+        }
+        $this->response->throwJson(['success' => true, 'results' => $results]);
     }
 
     /**
@@ -165,15 +226,18 @@ class Action extends Base implements ActionInterface
         ];
 
         try {
-            $result = DeepSeekClient::audit($comment, $article, $features, Plugin::settings());
+            $result = DeepSeekClient::audit($comment, $article, $features, Plugin::settings(), true);
             $this->response->throwJson([
                 'success' => empty($result['error']),
                 'result' => $result,
+                'message' => !empty($result['error'])
+                    ? ($result['diagnostic'] ?? Logger::reasonLabel($result['reason']))
+                    : null,
             ]);
         } catch (\Throwable $e) {
             $this->response->throwJson([
                 'success' => 0,
-                'message' => $e->getMessage(),
+                'message' => _t('连接测试失败，请检查 PHP 的错误日志。'),
             ]);
         }
     }

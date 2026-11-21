@@ -27,6 +27,22 @@ class Engine
      */
     public static function decide(array $comment, array $article, array $settings)
     {
+        return self::evaluate($comment, $article, $settings, false, true);
+    }
+
+    public static function preview(array $comment, array $article, array $settings, bool $withAi): array
+    {
+        return self::evaluate($comment, $article, $settings, true, $withAi);
+    }
+
+    private static function evaluate(
+        array $comment,
+        array $article,
+        array $settings,
+        bool $historical,
+        bool $withAi
+    ): array
+    {
         $rawText = (string) ($comment['text'] ?? '');
         $text = WordFilter::normalize($rawText);
         $author = trim((string) ($comment['author'] ?? ''));
@@ -42,8 +58,8 @@ class Engine
         $comment['ip'] = $ip;
         $comment['cid'] = $cid;
 
-        $reputation = Repository::reputation($comment);
-        $trustLevel = (string) $reputation['computed_level'];
+        $reputation = $withAi ? Repository::reputation($comment) : [];
+        $trustLevel = (string) ($reputation['computed_level'] ?? 'new');
 
         // 1. 本地硬规则
         if ($ip !== '' && Blacklist::matchIp($ip, $settings['ipBlacklist'] ?? '')) {
@@ -65,16 +81,28 @@ class Engine
         // 2. 本地软标记
         $flags = LocalPrecheck::flags($comment, $settings, $trustLevel);
 
-        $ipWindow = max(60, (int) ($settings['ipRateWindow'] ?? 600));
-        $ipLimit = max(0, (int) ($settings['ipRateLimit'] ?? 5));
-        $ipRecent = Repository::recentIpCount($ip, $ipWindow);
-        if ($ipLimit > 0 && $ipRecent >= $ipLimit) {
-            return self::waiting('local_rate_limit', $trustLevel, [], $flags);
+        if (!$withAi) {
+            if (in_array('suspect_word', $flags, true)) {
+                return self::waiting('history_suspect_word', $trustLevel);
+            }
+            if (in_array('too_many_links', $flags, true)) {
+                return self::waiting('history_link_limit', $trustLevel);
+            }
+            return self::approved('history_local_pass', $trustLevel);
         }
 
-        $duplicates = Repository::duplicateCount($cid, $rawText, 30);
-        if ($duplicates > 0) {
-            return self::reject('local_duplicate', $trustLevel, [], $flags);
+        // Submission-time counters can include the historical comment itself.
+        $ipRecent = 0;
+        if (!$historical) {
+            $ipWindow = max(60, (int) ($settings['ipRateWindow'] ?? 600));
+            $ipLimit = max(0, (int) ($settings['ipRateLimit'] ?? 5));
+            $ipRecent = Repository::recentIpCount($ip, $ipWindow);
+            if ($ipLimit > 0 && $ipRecent >= $ipLimit) {
+                return self::waiting('local_rate_limit', $trustLevel, [], $flags);
+            }
+            if (Repository::duplicateCount($cid, $rawText, 30) > 0) {
+                return self::reject('local_duplicate', $trustLevel, [], $flags);
+            }
         }
 
         // 3. DeepSeek
@@ -94,10 +122,10 @@ class Engine
 
         $aiComment = $comment;
         $aiComment['text'] = $text;
-        $ai = DeepSeekClient::audit($aiComment, $article, $features, $settings);
+        $ai = DeepSeekClient::audit($aiComment, $article, $features, $settings, $historical);
 
         // 4. 决策合并
-        return self::merge($ai, $trustLevel, $comment, $settings, $flags);
+        return self::merge($ai, $trustLevel, $comment, $settings, $flags, $historical);
     }
 
     /**
@@ -110,7 +138,7 @@ class Engine
      * @param array $flags
      * @return array
      */
-    private static function merge(array $ai, $trustLevel, array $comment, array $settings, array $flags)
+    private static function merge(array $ai, $trustLevel, array $comment, array $settings, array $flags, bool $historical)
     {
         $decision = (string) ($ai['decision'] ?? 'review');
         $category = (string) ($ai['category'] ?? 'normal');
@@ -136,12 +164,11 @@ class Engine
             }
 
             // 历史计数不包含当前这条；当前是第 3 条时拒绝。
-            $count = Repository::moderateAbuseCount($comment);
-            if ($count + 1 >= 3) {
+            if (!$historical && Repository::moderateAbuseCount($comment) + 1 >= 3) {
                 return self::reject('abuse_moderate_repeat', $trustLevel, $ai, $flags);
             }
 
-            return self::waiting('abuse_moderate_first', $trustLevel, $ai, $flags);
+            return self::waiting($historical ? 'history_moderate_abuse' : 'abuse_moderate_first', $trustLevel, $ai, $flags);
         }
 
         if ($category === 'abuse_severe') {

@@ -104,6 +104,10 @@ class Logger
             'hate_low_off_topic' => '低置信仇恨且与文章无关',
             'new_user_first' => '新用户首条评论',
             'off_topic' => '与文章无关',
+            'history_suspect_word' => '命中疑似敏感词',
+            'history_link_limit' => '链接数量超过上限',
+            'history_local_pass' => '未命中本地规则',
+            'history_moderate_abuse' => '疑似中度辱骂',
         ];
 
         return $map[$code] ?? $code;

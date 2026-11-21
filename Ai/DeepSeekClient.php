@@ -22,7 +22,7 @@ class DeepSeekClient
      * @param array $settings
      * @return array
      */
-    public static function audit(array $comment, array $article, array $features, array $settings)
+    public static function audit(array $comment, array $article, array $features, array $settings, bool $preview = false)
     {
         $model = trim((string) ($settings['deepseekModel'] ?? 'deepseek-flash'));
         if ($model === '') {
@@ -67,6 +67,10 @@ class DeepSeekClient
             'max_tokens' => $maxTokens,
             'stream' => false,
         ];
+        if (parse_url($baseUrl, PHP_URL_HOST) === 'api.deepseek.com'
+            && in_array($model, ['deepseek-flash', 'deepseek-v4-flash', 'deepseek-v4-pro'], true)) {
+            $body['thinking'] = ['type' => 'disabled'];
+        }
 
         $start = microtime(true);
         $response = self::request($endpoint, $apiKey, $body, $timeout, $sslVerify);
@@ -74,21 +78,27 @@ class DeepSeekClient
 
         if ($response['error'] !== '') {
             self::debug($settings, 'http error status=' . (int) $response['status']);
-            self::recordFailure();
-            return self::failure('ai_error', $latency);
+            if (!$preview) {
+                self::recordFailure();
+            }
+            return self::failure('ai_error', $latency, self::requestDiagnostic($response['status'], $response['error']));
         }
 
         $data = json_decode($response['body'], true);
         if (!is_array($data)) {
             self::debug($settings, 'invalid response JSON');
-            self::recordFailure();
-            return self::failure('ai_error', $latency);
+            if (!$preview) {
+                self::recordFailure();
+            }
+            return self::failure('ai_error', $latency, _t('服务没有返回有效的 JSON，请检查 DeepSeek 服务地址。'));
         }
 
         if (isset($data['error'])) {
             self::debug($settings, 'API returned an error');
-            self::recordFailure();
-            return self::failure('ai_error', $latency);
+            if (!$preview) {
+                self::recordFailure();
+            }
+            return self::failure('ai_error', $latency, _t('服务拒绝了审核请求，请检查模型和账户设置。'));
         }
 
         $content = '';
@@ -100,13 +110,22 @@ class DeepSeekClient
         $parsed = ResultParser::parse($content);
         if (!$parsed) {
             self::debug($settings, 'could not parse the audit decision');
-            self::recordFailure();
-            return self::failure('ai_error', $latency);
+            if (!$preview) {
+                self::recordFailure();
+            }
+            $truncated = ($data['choices'][0]['finish_reason'] ?? '') === 'length';
+            return self::failure('ai_error', $latency, $truncated
+                ? _t('模型输出被截断，请在插件设置中增加「最大 token 数」。')
+                : _t('模型没有返回可用的审核结果，请检查模型设置后重试。'));
         }
 
         $parsed['latency_ms'] = $latency;
         $parsed['tokens'] = (int) ($data['usage']['total_tokens'] ?? 0);
         $parsed['cached'] = false;
+
+        if ($preview) {
+            return $parsed;
+        }
 
         try {
             Repository::setCache(
@@ -148,6 +167,9 @@ class DeepSeekClient
             curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, $sslVerify);
             curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, $sslVerify ? 2 : 0);
+            if ($sslVerify && PHP_OS_FAMILY === 'Windows' && defined('CURLSSLOPT_NATIVE_CA')) {
+                curl_setopt($ch, CURLOPT_SSL_OPTIONS, CURLSSLOPT_NATIVE_CA);
+            }
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
                 'Content-Type: application/json',
                 'Authorization: Bearer ' . $apiKey,
@@ -155,17 +177,21 @@ class DeepSeekClient
 
             $result = curl_exec($ch);
             $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $error = curl_error($ch);
+            $errno = curl_errno($ch);
             curl_close($ch);
 
             if ($result === false) {
-                return ['body' => '', 'error' => $error ?: 'curl_error', 'status' => $status];
+                return ['body' => '', 'error' => 'curl_' . $errno, 'status' => $status];
             }
             if ($status >= 400) {
                 return ['body' => (string) $result, 'error' => 'http_' . $status, 'status' => $status];
             }
 
             return ['body' => (string) $result, 'error' => '', 'status' => $status];
+        }
+
+        if (parse_url($endpoint, PHP_URL_SCHEME) === 'https' && !in_array('https', stream_get_wrappers(), true)) {
+            return ['body' => '', 'error' => 'https_unavailable', 'status' => 0];
         }
 
         $context = stream_context_create([
@@ -175,6 +201,7 @@ class DeepSeekClient
                 'content' => $payload,
                 'timeout' => $timeout,
                 'ignore_errors' => true,
+                'follow_location' => 0,
             ],
             'ssl' => [
                 'verify_peer' => $sslVerify,
@@ -188,7 +215,8 @@ class DeepSeekClient
         }
 
         $status = 0;
-        if (!empty($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $m)) {
+        $headers = function_exists('http_get_last_response_headers') ? http_get_last_response_headers() : ($http_response_header ?? []);
+        if (!empty($headers[0]) && preg_match('/\s(\d{3})\b/', $headers[0], $m)) {
             $status = (int) $m[1];
         }
 
@@ -197,6 +225,28 @@ class DeepSeekClient
         }
 
         return ['body' => (string) $result, 'error' => '', 'status' => $status];
+    }
+
+    private static function requestDiagnostic(int $status, string $error): string
+    {
+        if ($status >= 500) {
+            return _t('DeepSeek 服务暂时不可用（HTTP %d），请稍后重试。', $status);
+        }
+
+        return match ($status) {
+            400, 422 => _t('DeepSeek 无法接受此请求（HTTP %d），请检查模型和服务地址。', $status),
+            401 => _t('DeepSeek 未接受当前密钥（HTTP 401），请核对密钥和服务地址。'),
+            402 => _t('DeepSeek 账户余额不足（HTTP 402），请充值后继续扫描。'),
+            403 => _t('DeepSeek 拒绝访问（HTTP 403），请检查账号权限。'),
+            404 => _t('DeepSeek 找不到接口或模型（HTTP 404），请检查服务地址和模型名称。'),
+            429 => _t('DeepSeek 请求过多（HTTP 429），请稍后重试。'),
+            default => match ($error) {
+                'https_unavailable' => _t('本机 PHP 未启用 HTTPS 请求支持，请启用 cURL 或 OpenSSL 扩展。'),
+                'curl_28' => _t('连接 DeepSeek 超时，请检查网络或增加「请求超时（秒）」。'),
+                'curl_51', 'curl_60', 'curl_77' => _t('服务器无法验证 DeepSeek 的 SSL 证书，请检查本机信任的证书。'),
+                default => _t('无法连接 DeepSeek，请检查网络和服务地址。'),
+            },
+        };
     }
 
     /**
@@ -221,7 +271,7 @@ class DeepSeekClient
      * @param int $latency
      * @return array
      */
-    private static function failure($reason, $latency = 0)
+    private static function failure($reason, $latency = 0, ?string $diagnostic = null)
     {
         return [
             'decision' => 'review',
@@ -236,6 +286,7 @@ class DeepSeekClient
             'tokens' => 0,
             'cached' => false,
             'error' => true,
+            'diagnostic' => $diagnostic,
         ];
     }
 

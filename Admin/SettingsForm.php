@@ -2,6 +2,7 @@
 
 namespace TypechoPlugin\CommentAudit\Admin;
 
+use Typecho\Common;
 use Typecho\Widget\Helper\Form;
 use Typecho\Widget\Helper\Form\Element;
 use Typecho\Widget\Helper\Form\Element\Checkbox;
@@ -44,7 +45,7 @@ final class SettingsForm
             'connection' => [_t('DeepSeek 连接'), _t('配置审核服务的地址、模型与访问凭据。'), [
                 'deepseekApiKey' => [Password::class, _t('API Key'), !$hasApiKey
                     ? _t('尚未配置。填写并保存后即可测试连接。')
-                    : _t('已配置。输入新 Key 可替换。')],
+                    : _t('已配置。可替换为新 Key，或清空后保存。')],
                 'deepseekModel' => [Text::class, _t('模型'), _t('默认 deepseek-flash。')],
                 'deepseekBaseUrl' => [Text::class, _t('服务地址'), _t('默认 https://api.deepseek.com。')],
                 'deepseekTimeout' => [Number::class, _t('请求超时（秒）'), _t('默认 8 秒。')],
@@ -107,7 +108,10 @@ final class SettingsForm
             '<div class="commentaudit-config-footer">'
             . '<div class="commentaudit-config-tabs" role="tablist" aria-label="' . self::escape(_t('设置分组')) . '" hidden>'
             . $tabs . '</div>'
-            . '<a href="' . self::escape($advanced) . '">' . _t('高级设置与维护') . '</a></div>'
+            . '<div class="commentaudit-config-links">'
+            . '<a href="' . self::escape($advanced) . '">' . _t('高级设置与维护') . '</a>'
+            . '<a href="https://github.com/RainReiki/CommentAudit" target="_blank" rel="noopener noreferrer">'
+            . _t('查看更新') . '</a></div></div>'
         ));
 
         // Typecho calls getInput() for every stored key, including ones managed elsewhere.
@@ -127,7 +131,8 @@ final class SettingsForm
     public static function merge(array $settings, array $submitted): array
     {
         $key = $submitted['deepseekApiKey'] ?? null;
-        if (is_string($key) && trim($key) !== '') {
+        // A field containing masking characters must never replace the stored key.
+        if (is_string($key) && strpos($key, '•') === false) {
             $settings['deepseekApiKey'] = trim($key);
         }
 
@@ -172,17 +177,13 @@ final class SettingsForm
         [$type, $label, $description] = $field;
         if ($type === Password::class) {
             // Typecho reapplies stored values before rendering. A saved credential must stay server-side.
-            $input = new class ($name, null, null, $label, $description) extends Password {
+            $input = new class ($name, null, $value, $label, $description) extends Password {
                 public function value($value): Element
                 {
-                    return parent::value(null);
+                    return parent::value(str_repeat('•', Common::strLen(trim((string) $value))));
                 }
             };
             $input->input->setAttribute('autocomplete', 'new-password');
-            if (trim((string) $value) !== '') {
-                $input->input->setAttribute('placeholder', '••••••••');
-                $input->setAttribute('class', 'typecho-option commentaudit-key-configured');
-            }
         } else {
             $input = new $type($name, $field[3] ?? null, $value, $label, $description);
         }
