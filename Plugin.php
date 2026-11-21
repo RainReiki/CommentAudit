@@ -8,14 +8,7 @@ use Typecho\Plugin\PluginInterface;
 use Typecho\Plugin\Exception as PluginException;
 use Typecho\Widget\Exception as WidgetException;
 use Typecho\Widget\Helper\Form;
-use Typecho\Widget\Helper\Form\Element\Checkbox;
-use Typecho\Widget\Helper\Form\Element\Hidden;
-use Typecho\Widget\Helper\Form\Element\Number;
-use Typecho\Widget\Helper\Form\Element\Password;
-use Typecho\Widget\Helper\Form\Element\Radio;
-use Typecho\Widget\Helper\Form\Element\Text;
-use Typecho\Widget\Helper\Form\Element\Textarea;
-use Typecho\Widget\Helper\Layout;
+use TypechoPlugin\CommentAudit\Admin\SettingsForm;
 use Utils\Helper;
 use Widget\Comments\Edit;
 use Widget\Feedback;
@@ -34,12 +27,12 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  *
  * @package CommentAudit
  * @author 羽忆
- * @version 1.0.5
+ * @version 1.0.7
  * @link https://lizihao.com/
  */
 class Plugin implements PluginInterface
 {
-    public const VERSION = '1.0.5';
+    public const VERSION = '1.0.7';
     public const PLUGIN_NAME = 'CommentAudit';
 
     /**
@@ -97,302 +90,22 @@ class Plugin implements PluginInterface
         return _t('评论审核插件已禁用，数据表已保留。');
     }
 
-    /**
-     * 插件配置页只保留入口，详细设置进入独立面板。
-     *
-     * @param Form $form
-     */
+    /** 使用 Typecho 的原生保存流程。 */
     public static function config(Form $form)
     {
-        $options = Options::alloc();
-        $panelUrl = $options->adminUrl('extending.php?panel=' . urlencode('CommentAudit/panel.php'), true);
-        $settings = self::settings();
-
-        $layout = new Layout('div', ['class' => 'typecho-option']);
-        $layout->html(
-            '<p>' . _t('这里的“基础信息”只包含 DeepSeek 连接参数；规则、信誉、日志和高级功能仍在独立面板中配置。') . '</p>' .
-            '<p><a class="btn primary" href="' . htmlspecialchars($panelUrl, ENT_QUOTES, 'UTF-8') . '">'
-            . _t('打开评论审核设置') . '</a></p>' .
-            '<p class="description">' . _t('待审核、垃圾、已通过仍然使用 Typecho 原生评论管理页。') . '</p>'
-        );
-        $form->addItem($layout);
-
-        $addSection = static function ($title, $description, $group) use ($form) {
-            $section = new Layout('div', ['class' => 'typecho-option commentaudit-config-section']);
-            $section->setAttribute('data-ca-group', $group);
-            $section->html(
-                '<h3 style="margin:18px 0 4px;">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h3>' .
-                '<p class="description" style="margin:0 0 8px;">' .
-                htmlspecialchars($description, ENT_QUOTES, 'UTF-8') . '</p>'
-            );
-            $form->addItem($section);
-        };
-
-        // Typecho 的插件配置页会遍历已有配置键并逐个调用 getInput()，
-        // 因此这里为每个配置键保留一个输入项。基础/本地设置在这里编辑。
-        foreach ($settings as $name => $value) {
-            if ($name === 'blockWords') {
-                $addSection(_t('本地审核规则'), _t('明确违禁词直接拒绝；疑似词只作为 AI 的参考信号。'), 'local');
-                $textarea = new Textarea('blockWords', null, (string) $value, _t('明确违禁词'), _t('每行一个词。'));
-                $textarea->setAttribute('rows', '8');
-                $form->addInput($textarea);
-            } elseif ($name === 'suspectWords') {
-                $textarea = new Textarea('suspectWords', null, (string) $value, _t('疑似敏感词'), _t('每行一个词，交给 AI 判断。'));
-                $textarea->setAttribute('rows', '8');
-                $form->addInput($textarea);
-            } elseif ($name === 'wordScopes') {
-                $scopes = is_array($value) ? $value : [];
-                $checkbox = new Checkbox(
-                    'wordScopes',
-                    ['text' => _t('评论内容'), 'author' => _t('昵称'), 'mail' => _t('邮箱'), 'url' => _t('网址')],
-                    $scopes,
-                    _t('词表作用域')
-                );
-                $form->addInput($checkbox->multiMode());
-            } elseif ($name === 'ipBlacklist') {
-                $textarea = new Textarea('ipBlacklist', null, (string) $value, _t('IP 黑名单'), _t('每行一个 IP 或 CIDR，例如 1.2.3.4 或 1.2.3.0/24。'));
-                $textarea->setAttribute('rows', '5');
-                $form->addInput($textarea);
-            } elseif ($name === 'emailBlacklist') {
-                $textarea = new Textarea('emailBlacklist', null, (string) $value, _t('邮箱黑名单'), _t('每行一个邮箱或域名，例如 spam@example.com 或 *@spam.com。'));
-                $textarea->setAttribute('rows', '5');
-                $form->addInput($textarea);
-            } elseif ($name === 'urlBlacklist') {
-                $textarea = new Textarea('urlBlacklist', null, (string) $value, _t('网址黑名单'), _t('每行一个域名、子域名或 URL 前缀，例如 spam.com、*.spam.com、https://spam.com/path。'));
-                $textarea->setAttribute('rows', '5');
-                $form->addInput($textarea);
-            } elseif ($name === 'ipRateLimit') {
-                $addSection(_t('本地预检'), _t('在调用 AI 之前先处理明显的频率和链接异常。'), 'precheck');
-                $form->addInput(new Number('ipRateLimit', null, (string) $value, _t('同一 IP 评论数上限'), _t('0 表示不限制。')));
-            } elseif ($name === 'ipRateWindow') {
-                $form->addInput(new Number('ipRateWindow', null, (string) $value, _t('统计窗口（秒）'), _t('默认 600 秒。')));
-            } elseif ($name === 'linkLimit') {
-                $form->addInput(new Number('linkLimit', null, (string) $value, _t('链接数量上限'), _t('超过后只打 suspect 标记，不直接拒绝。')));
-            } elseif ($name === 'deepseekApiKey') {
-                $addSection(_t('DeepSeek 连接'), _t('连接信息只保存在这里；规则面板中的“AI 审核”只保留阈值和缓存。'), 'deepseek');
-                $password = new Password(
-                    'deepseekApiKey',
-                    null,
-                    (string) $value,
-                    _t('DeepSeek API Key'),
-                    _t('留空保存时不会清空已有 Key。')
-                );
-                $form->addInput($password);
-            } elseif ($name === 'deepseekModel') {
-                $form->addInput(new Text(
-                    'deepseekModel',
-                    null,
-                    (string) $value,
-                    _t('DeepSeek 模型'),
-                    _t('默认 deepseek-flash，可切换 deepseek-v4-pro。')
-                ));
-            } elseif ($name === 'deepseekBaseUrl') {
-                $form->addInput(new Text(
-                    'deepseekBaseUrl',
-                    null,
-                    (string) $value,
-                    _t('DeepSeek Base URL'),
-                    _t('默认 https://api.deepseek.com。')
-                ));
-            } elseif ($name === 'deepseekTimeout') {
-                $form->addInput(new Number(
-                    'deepseekTimeout',
-                    null,
-                    (string) $value,
-                    _t('DeepSeek 超时（秒）'),
-                    _t('建议 8–15 秒。')
-                ));
-            } elseif ($name === 'deepseekMaxTokens') {
-                $form->addInput(new Number(
-                    'deepseekMaxTokens',
-                    null,
-                    (string) $value,
-                    _t('DeepSeek 最大 token'),
-                    _t('默认 1200，推理模型需要给 JSON 输出留空间。')
-                ));
-            } elseif ($name === 'deepseekSslVerify') {
-                $form->addInput(new Radio(
-                    'deepseekSslVerify',
-                    ['1' => _t('开启'), '0' => _t('关闭')],
-                    (string) $value,
-                    _t('验证 SSL 证书'),
-                    _t('生产环境请开启；本地自签名证书可临时关闭。')
-                ));
-            } elseif ($name === 'deepseekDebug') {
-                $form->addInput(new Radio(
-                    'deepseekDebug',
-                    ['1' => _t('开启'), '0' => _t('关闭')],
-                    (string) $value,
-                    _t('DeepSeek 调试日志'),
-                    _t('仅排障时开启。')
-                ));
-            } elseif ($name === 'thresholdNew') {
-                $addSection(_t('AI 审核策略'), _t('AI 判定 block 时使用的三档置信度阈值。'), 'ai');
-                $number = new Number('thresholdNew', null, (string) $value, _t('新用户阈值'), _t('默认 0.7。'));
-                $number->setAttribute('step', '0.05');
-                $form->addInput($number);
-            } elseif ($name === 'thresholdNormal') {
-                $number = new Number('thresholdNormal', null, (string) $value, _t('普通用户阈值'), _t('默认 0.8。'));
-                $number->setAttribute('step', '0.05');
-                $form->addInput($number);
-            } elseif ($name === 'thresholdTrusted') {
-                $number = new Number('thresholdTrusted', null, (string) $value, _t('老访客阈值'), _t('默认 0.9。'));
-                $number->setAttribute('step', '0.05');
-                $form->addInput($number);
-            } elseif ($name === 'cacheTtl') {
-                $form->addInput(new Number('cacheTtl', null, (string) $value, _t('AI 缓存天数'), _t('默认 7 天。')));
-            } elseif ($name === 'advancedCommentList') {
-                $addSection(_t('高级与兼容'), _t('这些选项影响后台展示和日志维护，不影响前台评论审核逻辑。'), 'advanced');
-                $form->addInput(new Radio(
-                    'advancedCommentList',
-                    ['1' => _t('开启'), '0' => _t('关闭')],
-                    (string) $value,
-                    _t('评论列表增强'),
-                    _t('在 Typecho 原生评论列表显示审核原因、AI 详情和快捷拉黑。')
-                ));
-            } elseif ($name === 'logRetention') {
-                $form->addInput(new Number(
-                    'logRetention',
-                    null,
-                    (string) $value,
-                    _t('审核日志保留天数'),
-                    _t('默认 90 天，范围 1–3650 天。')
-                ));
-            } else {
-                $hidden = new Hidden($name, null, is_scalar($value) ? (string) $value : '');
-                $form->addInput($hidden);
-            }
-        }
-
-        $groupMap = [
-            'blockWords' => 'local',
-            'suspectWords' => 'local',
-            'wordScopes' => 'local',
-            'ipBlacklist' => 'local',
-            'emailBlacklist' => 'local',
-            'urlBlacklist' => 'local',
-            'ipRateLimit' => 'precheck',
-            'ipRateWindow' => 'precheck',
-            'linkLimit' => 'precheck',
-            'deepseekApiKey' => 'deepseek',
-            'deepseekModel' => 'deepseek',
-            'deepseekBaseUrl' => 'deepseek',
-            'deepseekTimeout' => 'deepseek',
-            'deepseekMaxTokens' => 'deepseek',
-            'deepseekSslVerify' => 'deepseek',
-            'deepseekDebug' => 'deepseek',
-            'thresholdNew' => 'ai',
-            'thresholdNormal' => 'ai',
-            'thresholdTrusted' => 'ai',
-            'cacheTtl' => 'ai',
-            'advancedCommentList' => 'advanced',
-            'logRetention' => 'advanced',
-        ];
-
-        foreach ($form->getInputs() as $name => $input) {
-            if (isset($groupMap[$name])) {
-                $input->setAttribute('data-ca-group', $groupMap[$name]);
-            }
-        }
-
-        $ui = new Layout('div', ['class' => 'commentaudit-config-ui']);
-        $ui->html(<<<'HTML'
-<style>
-.commentaudit-config-tabs { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; float: none; margin: 8px 0 16px; padding: 0; list-style: none; }
-.commentaudit-config-tabs li { float: none; margin: 0; }
-.commentaudit-config-tabs li a { display: inline-block; cursor: pointer; }
-.commentaudit-config-section { display: block; }
-</style>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    var form = document.querySelector('form');
-    if (!form) {
-        return;
+        SettingsForm::render($form, self::settings());
     }
 
-    var elements = Array.prototype.slice.call(form.querySelectorAll('[data-ca-group]'));
-    if (!elements.length) {
-        return;
-    }
-
-    var tabs = [
-        ['deepseek', '基础连接'],
-        ['local', '本地规则'],
-        ['precheck', '本地预检'],
-        ['ai', 'AI 策略'],
-        ['advanced', '高级设置']
-    ];
-
-    var nav = document.createElement('ul');
-    nav.className = 'typecho-option-tabs commentaudit-config-tabs';
-
-    tabs.forEach(function (item) {
-        var li = document.createElement('li');
-        var link = document.createElement('a');
-        link.href = '#';
-        link.textContent = item[1];
-        link.setAttribute('data-ca-tab', item[0]);
-        li.appendChild(link);
-        nav.appendChild(li);
-    });
-
-    var first = elements[0];
-    first.parentNode.insertBefore(nav, first);
-
-    function activate(group) {
-        elements.forEach(function (element) {
-            element.style.display = element.getAttribute('data-ca-group') === group ? '' : 'none';
-        });
-        Array.prototype.forEach.call(nav.querySelectorAll('a'), function (link) {
-            link.parentNode.className = link.getAttribute('data-ca-tab') === group ? 'current' : '';
-        });
-    }
-
-    nav.addEventListener('click', function (event) {
-        var link = event.target.closest ? event.target.closest('a[data-ca-tab]') : null;
-        if (!link) {
-            return;
-        }
-        event.preventDefault();
-        activate(link.getAttribute('data-ca-tab'));
-    });
-
-    activate('deepseek');
-});
-</script>
-HTML
-        );
-        $form->addItem($ui);
-    }
-
-    /**
-     * 插件配置页保存时，保留空的 API Key，避免误清空。
-     *
-     * @param array $settings
-     * @param bool $isInit
-     */
-    public static function configHandle($settings, $isInit)
+    public static function configHandle(array $settings, bool $isInit): void
     {
-        $current = self::settings();
-        $settings = is_array($settings) ? $settings : [];
-
-        if (empty($settings['deepseekApiKey'])) {
-            $settings['deepseekApiKey'] = $current['deepseekApiKey'];
+        if (!$isInit) {
+            Helper::configPlugin(self::PLUGIN_NAME, SettingsForm::merge(self::settings(), $settings));
         }
+    }
 
-        if (isset($settings['wordScopes']) && !is_array($settings['wordScopes'])) {
-            $settings['wordScopes'] = $current['wordScopes'];
-        }
-
-        // 表单中未提交的隐藏字段会以 null 出现，保留原值，避免误清空规则。
-        $merged = $current;
-        foreach ($settings as $key => $value) {
-            if ($value !== null) {
-                $merged[$key] = $value;
-            }
-        }
-
-        Helper::configPlugin(self::PLUGIN_NAME, $merged);
+    public static function assetUrl(string $file): string
+    {
+        return rtrim(Options::alloc()->pluginUrl, '/') . '/CommentAudit/assets/' . $file . '?v=' . self::VERSION;
     }
 
     /**
@@ -560,19 +273,17 @@ HTML
                 return;
             }
 
-            $pluginUrl = Options::alloc()->pluginUrl . '/CommentAudit/assets';
             $actionUrl = Helper::security()->getIndex('/action/comment-audit?do=audit-info');
             $blacklistUrl = Helper::security()->getIndex('/action/comment-audit?do=blacklist');
             ?>
-            <link rel="stylesheet" href="<?php echo htmlspecialchars($pluginUrl . '/admin.css', ENT_QUOTES, 'UTF-8'); ?>">
+            <link rel="stylesheet" href="<?php echo htmlspecialchars(self::assetUrl('admin.css'), ENT_QUOTES, 'UTF-8'); ?>">
             <script>
             window.CommentAuditEnhance = {
-                actionUrl: <?php echo json_encode($actionUrl, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
-                blacklistUrl: <?php echo json_encode($blacklistUrl, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
-                pluginUrl: <?php echo json_encode($pluginUrl, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>
+                actionUrl: <?php echo json_encode($actionUrl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+                blacklistUrl: <?php echo json_encode($blacklistUrl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>
             };
             </script>
-            <script src="<?php echo htmlspecialchars($pluginUrl . '/comments-enhance.js', ENT_QUOTES, 'UTF-8'); ?>"></script>
+            <script src="<?php echo htmlspecialchars(self::assetUrl('comments-enhance.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
             <?php
         } catch (\Throwable $e) {
             // 增强脚本失败时静默退出。

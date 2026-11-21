@@ -32,13 +32,12 @@ class Action extends Base implements ActionInterface
 
         $do = (string) $this->request->get('do', '');
 
+        if (in_array($do, ['save-advanced', 'clear-cache', 'set-trust', 'blacklist'], true) && !$this->request->isPost()) {
+            $this->response->setStatus(405);
+            return;
+        }
+
         switch ($do) {
-            case 'save-rules':
-                $this->saveRules();
-                break;
-            case 'save-deepseek':
-                $this->saveDeepSeek();
-                break;
             case 'save-advanced':
                 $this->saveAdvanced();
                 break;
@@ -61,54 +60,8 @@ class Action extends Base implements ActionInterface
                 $this->setTrust();
                 break;
             default:
-                $this->back('rules');
+                $this->back('overview');
         }
-    }
-
-    /**
-     * 保存本地规则。
-     */
-    private function saveRules()
-    {
-        $settings = Plugin::settings();
-
-        $scopes = $this->request->getArray('wordScopes');
-        $allowedScopes = ['text', 'author', 'mail', 'url'];
-        $scopes = array_values(array_intersect($allowedScopes, array_map('strval', $scopes)));
-
-        $settings['blockWords'] = (string) $this->request->get('blockWords', '');
-        $settings['suspectWords'] = (string) $this->request->get('suspectWords', '');
-        $settings['wordScopes'] = $scopes;
-        $settings['ipBlacklist'] = (string) $this->request->get('ipBlacklist', '');
-        $settings['emailBlacklist'] = (string) $this->request->get('emailBlacklist', '');
-        $settings['urlBlacklist'] = (string) $this->request->get('urlBlacklist', '');
-        $settings['ipRateLimit'] = max(0, (int) $this->request->get('ipRateLimit', 5));
-        $settings['ipRateWindow'] = max(60, (int) $this->request->get('ipRateWindow', 600));
-        $settings['linkLimit'] = max(0, (int) $this->request->get('linkLimit', 3));
-
-        Helper::configPlugin(Plugin::PLUGIN_NAME, $settings);
-        Notice::alloc()->set(_t('本地规则已保存'), 'success');
-        $this->back('rules');
-    }
-
-    /**
-     * 保存 DeepSeek 设置。
-     */
-    private function saveDeepSeek()
-    {
-        $settings = Plugin::settings();
-
-        // 连接信息（API Key、模型、Base URL、超时、SSL、调试）在插件原生设置页维护，
-        // 这里只修改审核阈值和缓存。
-        $settings['thresholdNew'] = $this->threshold('thresholdNew', 0.7);
-        $settings['thresholdNormal'] = $this->threshold('thresholdNormal', 0.8);
-        $settings['thresholdTrusted'] = $this->threshold('thresholdTrusted', 0.9);
-        $settings['aiFailPolicy'] = 'review';
-        $settings['cacheTtl'] = max(1, min(30, (int) $this->request->get('cacheTtl', 7)));
-
-        Helper::configPlugin(Plugin::PLUGIN_NAME, $settings);
-        Notice::alloc()->set(_t('DeepSeek 设置已保存'), 'success');
-        $this->back('deepseek');
     }
 
     /**
@@ -118,11 +71,20 @@ class Action extends Base implements ActionInterface
     {
         $settings = Plugin::settings();
         $settings['advancedCommentList'] = $this->request->get('advancedCommentList') === '1' ? 1 : 0;
-        $settings['logRetention'] = max(1, min(3650, (int) $this->request->get('logRetention', 90)));
+        $settings['logRetention'] = $this->readDays('logRetention', (int) $settings['logRetention'], 3650);
+        $settings['cacheTtl'] = $this->readDays('cacheTtl', (int) $settings['cacheTtl'], intdiv(PHP_INT_MAX - time(), 86400));
 
         Helper::configPlugin(Plugin::PLUGIN_NAME, $settings);
         Notice::alloc()->set(_t('高级设置已保存'), 'success');
         $this->back('advanced');
+    }
+
+    private function readDays(string $key, int $current, int $max): int
+    {
+        $value = filter_var($this->request->get($key), FILTER_VALIDATE_INT, [
+            'options' => ['min_range' => 1, 'max_range' => $max],
+        ]);
+        return $value === false ? $current : $value;
     }
 
     /**
@@ -375,18 +337,7 @@ class Action extends Base implements ActionInterface
     {
         Repository::clearCache();
         Notice::alloc()->set(_t('AI 缓存已清空'), 'success');
-        $this->back('deepseek');
-    }
-
-    /**
-     * @param string $key
-     * @param float $default
-     * @return float
-     */
-    private function threshold($key, $default)
-    {
-        $value = (float) $this->request->get($key, $default);
-        return max(0.1, min(1, $value));
+        $this->back('advanced');
     }
 
     /**
@@ -408,7 +359,7 @@ class Action extends Base implements ActionInterface
      *
      * @param string $tab
      */
-    private function back($tab = 'rules')
+    private function back(string $tab): void
     {
         $url = Helper::options()->adminUrl(
             'extending.php?panel=' . urlencode('CommentAudit/panel.php') . '&tab=' . urlencode($tab),

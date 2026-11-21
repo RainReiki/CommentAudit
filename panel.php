@@ -6,20 +6,25 @@ use TypechoPlugin\CommentAudit\Repository;
 use TypechoPlugin\CommentAudit\Rule\WordFilter;
 use Widget\Options;
 
-if (!defined('__TYPECHO_ROOT_DIR__')) {
+if (!defined('__TYPECHO_ADMIN__')) {
     exit;
 }
 
-include 'header.php';
-include 'menu.php';
-
 /** @var Options $options */
+$user->pass('administrator');
+$adminPath = __TYPECHO_ROOT_DIR__ . '/' . trim(
+    defined('__TYPECHO_ADMIN_DIR__') ? __TYPECHO_ADMIN_DIR__ : 'admin',
+    '/\\'
+);
 $plugin = Plugin::settings();
-$tab = (string) $request->get('tab', 'overview');
-$allowedTabs = ['overview', 'reputation', 'logs'];
-if (!in_array($tab, $allowedTabs, true)) {
-    $tab = 'overview';
-}
+$tabs = [
+    'overview' => _t('概览'),
+    'reputation' => _t('信誉管理'),
+    'logs' => _t('审核日志'),
+    'advanced' => _t('高级设置'),
+];
+$tab = $request->get('tab', 'overview');
+$tab = is_string($tab) && isset($tabs[$tab]) ? $tab : 'overview';
 
 $panelBase = 'extending.php?panel=' . urlencode('CommentAudit/panel.php');
 $pluginSettingsUrl = $options->adminUrl('options-plugin.php?config=CommentAudit', true);
@@ -40,152 +45,35 @@ $trustLabel = static function ($level) {
     $map = ['new' => _t('新用户'), 'normal' => _t('普通用户'), 'trusted' => _t('老访客'), 'whitelist' => _t('白名单')];
     return $map[$level] ?? (string) $level;
 };
-?>
-<style>
-.commentaudit-wrap {
-    display: block;
-    width: 100%;
-    max-width: 1140px;
-    margin: 0 auto;
-    padding: 0 20px;
-    box-sizing: border-box;
-    --ca-bg: #fff;
-    --ca-text: #22313f;
-    --ca-muted: #6b7c8c;
-    --ca-border: #d9e2ea;
-    --ca-th-bg: #f8fafc;
-    --ca-soft-bg: #f7fafc;
-    --ca-input-bg: #fff;
-    --ca-input-border: #ccd7e1;
-    --ca-shadow: 0 1px 5px rgba(0, 0, 0, .06);
-}
-.commentaudit-tabs {
-    clear: both;
-    width: 100%;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin: 0 0 18px;
-    padding: 0;
-    list-style: none;
-}
-.commentaudit-tabs li {
-    float: none;
-    margin: 0;
-}
-.commentaudit-tabs li a {
-    display: inline-block;
-}
-.commentaudit-card { background: var(--ca-bg); color: var(--ca-text); border: 1px solid var(--ca-border); border-radius: 8px; padding: 18px 20px; margin-bottom: 16px; box-shadow: var(--ca-shadow); }
-.commentaudit-card h3 { margin: 0 0 8px; font-size: 15px; color: var(--ca-text); }
-.commentaudit-card p.commentaudit-desc { color: var(--ca-muted); margin: 0 0 14px; line-height: 1.7; }
-.commentaudit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.commentaudit-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.commentaudit-field { margin-bottom: 14px; }
-.commentaudit-field label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--ca-text); }
-.commentaudit-field .description { color: var(--ca-muted); line-height: 1.6; }
-.commentaudit-field textarea, .commentaudit-field input[type=text], .commentaudit-field input[type=password], .commentaudit-field input[type=number], .commentaudit-field select {
-    width: 100%;
-    box-sizing: border-box;
-    background: var(--ca-input-bg);
-    color: var(--ca-text);
-    border: 1px solid var(--ca-input-border);
-    border-radius: 6px;
-    padding: 6px 8px;
-}
-.commentaudit-checkboxes label { display: inline-block; margin-right: 16px; font-weight: 400; }
-.commentaudit-actions { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.commentaudit-table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.commentaudit-table { width: 100%; border-collapse: collapse; color: var(--ca-text); }
-.commentaudit-identity { word-break: break-all; }
-.commentaudit-trust-form { display: flex; gap: 6px; align-items: center; }
-.commentaudit-table th, .commentaudit-table td { border-bottom: 1px solid var(--ca-border); padding: 9px 8px; text-align: left; vertical-align: top; }
-.commentaudit-table th { color: var(--ca-muted); font-weight: 600; background: var(--ca-th-bg); }
-.commentaudit-muted { color: var(--ca-muted); }
-.commentaudit-badge { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 12px; background: rgba(80, 120, 150, .14); color: inherit; }
-.commentaudit-badge-approved { background: rgba(35, 122, 67, .18); }
-.commentaudit-badge-waiting { background: rgba(154, 100, 0, .18); }
-.commentaudit-badge-rejected, .commentaudit-badge-spam { background: rgba(165, 42, 42, .18); }
-.commentaudit-result { white-space: pre-wrap; background: #0f1720; color: #d7e3ee; padding: 12px; border-radius: 8px; min-height: 80px; overflow: auto; }
-.commentaudit-stat { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
-.commentaudit-stat div { background: var(--ca-soft-bg); border: 1px solid var(--ca-border); border-radius: 8px; padding: 12px; }
-.commentaudit-stat strong { display: block; font-size: 22px; margin-bottom: 4px; }
 
-/* NewAdmin 夜间模式：link#darkcss 启用时生效；同时兼容系统深色。 */
-@media (prefers-color-scheme: dark) {
-    .commentaudit-wrap {
-        --ca-bg: #16233a;
-        --ca-text: #e2e8f0;
-        --ca-muted: #94a3b8;
-        --ca-border: #334155;
-        --ca-th-bg: #1f2937;
-        --ca-soft-bg: #1e293b;
-        --ca-input-bg: #1f2937;
-        --ca-input-border: #334155;
-        --ca-shadow: 0 1px 5px rgba(0, 0, 0, .3);
-    }
-}
-html:has(#darkcss:not([disabled])) .commentaudit-wrap,
-html.dark .commentaudit-wrap,
-body.dark .commentaudit-wrap,
-#newadmin.dark .commentaudit-wrap,
-.newadmin.dark .commentaudit-wrap {
-    --ca-bg: #16233a;
-    --ca-text: #e2e8f0;
-    --ca-muted: #94a3b8;
-    --ca-border: #334155;
-    --ca-th-bg: #1f2937;
-    --ca-soft-bg: #1e293b;
-    --ca-input-bg: #1f2937;
-    --ca-input-border: #334155;
-    --ca-shadow: 0 1px 5px rgba(0, 0, 0, .3);
-}
-.commentaudit-log-excerpt { display: inline-block; max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
-.commentaudit-log-action { width: 80px; text-align: right; }
-.commentaudit-modal[hidden] { display: none; }
-.commentaudit-modal { position: fixed; inset: 0; z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 24px; }
-.commentaudit-modal-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .55); }
-.commentaudit-modal-dialog { position: relative; width: min(720px, 100%); max-height: 88vh; overflow: auto; background: var(--ca-bg); color: var(--ca-text); border: 1px solid var(--ca-border); border-radius: 10px; box-shadow: 0 20px 60px rgba(0, 0, 0, .35); }
-.commentaudit-modal-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; background: var(--ca-bg); border-bottom: 1px solid var(--ca-border); }
-.commentaudit-modal-head h3 { margin: 0; font-size: 16px; }
-.commentaudit-modal-close { border: 0; background: transparent; color: var(--ca-text); font-size: 26px; line-height: 1; cursor: pointer; padding: 0 4px; }
-.commentaudit-modal-body { padding: 16px 20px 20px; }
-.commentaudit-log-full { white-space: pre-wrap; word-break: break-word; background: var(--ca-soft-bg); border: 1px solid var(--ca-border); border-radius: 8px; padding: 12px; margin-bottom: 14px; max-height: 220px; overflow: auto; line-height: 1.7; }
-.commentaudit-log-detail-table th { width: 150px; white-space: nowrap; }
-.commentaudit-modal-open { overflow: hidden; }
-@media (max-width: 860px) {
-    .commentaudit-grid, .commentaudit-grid-3, .commentaudit-stat { grid-template-columns: 1fr; }
-    .commentaudit-log-table thead { display: none; }
-    .commentaudit-log-table tbody tr { display: block; border: 1px solid var(--ca-border); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
-    .commentaudit-log-table td { display: block; border: 0; padding: 5px 0; text-align: left; }
-    .commentaudit-log-table td::before { content: attr(data-label); display: inline-block; min-width: 70px; font-weight: 600; color: var(--ca-muted); }
-    .commentaudit-log-table td.commentaudit-log-action { text-align: left; padding-top: 8px; }
-    .commentaudit-log-table td.commentaudit-log-action::before { content: ''; min-width: 0; }
-    .commentaudit-log-excerpt { display: inline; max-width: none; white-space: normal; }
-    .commentaudit-modal { padding: 12px; }
-    .commentaudit-modal-dialog { max-height: 92vh; }
-    .commentaudit-modal-head, .commentaudit-modal-body { padding-left: 14px; padding-right: 14px; }
-    .commentaudit-log-detail-table th { width: 110px; white-space: normal; }
-    .commentaudit-reputation-table thead { display: none; }
-    .commentaudit-reputation-table tbody tr { display: block; border: 1px solid var(--ca-border); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
-    .commentaudit-reputation-table td { display: block; border: 0; padding: 5px 0; text-align: left; }
-    .commentaudit-reputation-table td::before { content: attr(data-label); display: inline-block; min-width: 88px; font-weight: 600; color: var(--ca-muted); }
-    .commentaudit-reputation-table td.commentaudit-reputation-action { padding-top: 8px; }
-    .commentaudit-reputation-table td.commentaudit-reputation-action::before { content: ''; min-width: 0; }
-    .commentaudit-trust-form { flex-wrap: wrap; }
-    .commentaudit-trust-form select { flex: 1 1 120px; max-width: 100%; }
-}
-</style>
+require $adminPath . '/header.php';
+require $adminPath . '/menu.php';
+?>
+<link rel="stylesheet" href="<?php echo $h(Plugin::assetUrl('admin.css')); ?>">
 
 <main class="main">
-    <div class="body container commentaudit-wrap">
-        <?php include 'page-title.php'; ?>
-
-        <ul class="typecho-option-tabs commentaudit-tabs">
-            <li<?php if ($tab === 'overview'): ?> class="current"<?php endif; ?>><a href="<?php echo $h($tabUrl('overview')); ?>"><?php _e('概览'); ?></a></li>
-            <li<?php if ($tab === 'reputation'): ?> class="current"<?php endif; ?>><a href="<?php echo $h($tabUrl('reputation')); ?>"><?php _e('信誉管理'); ?></a></li>
-            <li<?php if ($tab === 'logs'): ?> class="current"<?php endif; ?>><a href="<?php echo $h($tabUrl('logs')); ?>"><?php _e('审核日志'); ?></a></li>
-        </ul>
+    <div class="body container commentaudit-wrap commentaudit-scope">
+        <header class="commentaudit-hero">
+            <div>
+                <p class="commentaudit-eyebrow">CommentAudit</p>
+                <h2><?php echo $h($tabs[$tab]); ?></h2>
+                <p><?php
+                    $intro = [
+                        'overview' => _t('查看评论审核统计、运行状态和最近决策。'),
+                        'reputation' => _t('查找访客信誉，设置白名单或恢复自动评级。'),
+                        'logs' => _t('筛选历史审核记录并查看判定详情。'),
+                        'advanced' => _t('管理评论列表增强、日志保留和 AI 缓存。'),
+                    ];
+                    echo $h($intro[$tab]);
+                ?></p>
+            </div>
+            <a class="btn" href="<?php echo $h($pluginSettingsUrl); ?>"><?php _e('打开插件设置'); ?></a>
+        </header>
+        <nav class="commentaudit-nav" aria-label="<?php _e('评论审核页面'); ?>">
+            <?php foreach ($tabs as $name => $label): ?>
+                <a href="<?php echo $h($tabUrl($name)); ?>"<?php if ($tab === $name): ?> aria-current="page"<?php endif; ?>><?php echo $h($label); ?></a>
+            <?php endforeach; ?>
+        </nav>
 
         <?php if ($tab === 'overview'): ?>
             <?php
@@ -219,7 +107,7 @@ body.dark .commentaudit-wrap,
                     <div><strong><?php echo (int) $stats['rejected']; ?></strong><?php _e('拒绝'); ?></div>
                     <div><strong><?php echo (int) $stats['spam']; ?></strong><?php _e('垃圾'); ?></div>
                 </div>
-                <p class="commentaudit-muted" style="margin:10px 0 0;">
+                <p class="commentaudit-summary-note commentaudit-muted">
                     <?php
                     echo _t(
                         '统计时间：%s；今日从 %s 起算；累计审核：%s 条。',
@@ -242,10 +130,9 @@ body.dark .commentaudit-wrap,
                     </tbody>
                 </table>
                 <div class="commentaudit-actions">
-                    <a class="btn" href="<?php echo $h($pluginSettingsUrl); ?>"><?php _e('打开插件设置'); ?></a>
                     <button type="button" class="btn" id="commentaudit-overview-test"
                             data-url="<?php echo $h($actionUrl('test-connection')); ?>"><?php _e('测试连接'); ?></button>
-                    <span id="commentaudit-overview-test-result" class="commentaudit-muted"><?php _e('尚未测试'); ?></span>
+                    <span id="commentaudit-overview-test-result" role="status" class="commentaudit-muted"><?php _e('尚未测试'); ?></span>
                 </div>
             </div>
 
@@ -279,15 +166,15 @@ body.dark .commentaudit-wrap,
                     var url = button.getAttribute('data-url');
                     if (!url) return;
                     button.disabled = true;
-                    result.textContent = '<?php _e('测试中...'); ?>';
+                    result.textContent = <?php echo json_encode(_t('测试中...'), JSON_HEX_TAG); ?>;
                     fetch(url, {method: 'POST', credentials: 'same-origin'})
                         .then(function (response) { return response.json(); })
                         .then(function (data) {
-                            result.textContent = data && data.success ? '<?php _e('连接正常'); ?>' : '<?php _e('连接失败，请检查设置'); ?>';
+                            result.textContent = data && data.success ? <?php echo json_encode(_t('连接正常'), JSON_HEX_TAG); ?> : <?php echo json_encode(_t('连接失败，请检查设置'), JSON_HEX_TAG); ?>;
                             button.disabled = false;
                         })
                         .catch(function () {
-                            result.textContent = '<?php _e('测试失败'); ?>';
+                            result.textContent = <?php echo json_encode(_t('测试失败'), JSON_HEX_TAG); ?>;
                             button.disabled = false;
                         });
                 });
@@ -296,7 +183,7 @@ body.dark .commentaudit-wrap,
 
             <div class="commentaudit-card">
                 <h3><?php _e('最近决策'); ?></h3>
-                <table class="commentaudit-table">
+                <table class="commentaudit-table commentaudit-log-table">
                     <thead><tr><th><?php _e('时间'); ?></th><th><?php _e('作者'); ?></th><th><?php _e('决策'); ?></th><th><?php _e('原因'); ?></th><th><?php _e('信誉'); ?></th></tr></thead>
                     <tbody>
                     <?php if (empty($recent)): ?>
@@ -304,209 +191,17 @@ body.dark .commentaudit-wrap,
                     <?php else: ?>
                         <?php foreach ($recent as $row): ?>
                             <tr>
-                                <td><?php echo $h(date('Y-m-d H:i', (int) $row['created'])); ?></td>
-                                <td><?php echo $h($row['author']); ?></td>
-                                <td><span class="commentaudit-badge commentaudit-badge-<?php echo $h($row['decision']); ?>"><?php echo $h($decisionLabel($row['decision'])); ?></span></td>
-                                <td><?php echo $h(Logger::reasonLabel($row['reason_code'])); ?></td>
-                                <td><?php echo $h($trustLabel($row['trust_level'])); ?></td>
+                                <td data-label="<?php _e('时间'); ?>"><?php echo $h(date('Y-m-d H:i', (int) $row['created'])); ?></td>
+                                <td data-label="<?php _e('作者'); ?>"><?php echo $h($row['author']); ?></td>
+                                <td data-label="<?php _e('决策'); ?>"><span class="commentaudit-badge commentaudit-badge-<?php echo $h($row['decision']); ?>"><?php echo $h($decisionLabel($row['decision'])); ?></span></td>
+                                <td data-label="<?php _e('原因'); ?>"><?php echo $h(Logger::reasonLabel($row['reason_code'])); ?></td>
+                                <td data-label="<?php _e('信誉'); ?>"><?php echo $h($trustLabel($row['trust_level'])); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
                     </tbody>
                 </table>
             </div>
-
-        <?php elseif ($tab === 'summary'): ?>
-            <?php
-            $scopeText = [];
-            foreach ((array) $plugin['wordScopes'] as $scope) {
-                $scopeMap = ['text' => _t('内容'), 'author' => _t('昵称'), 'mail' => _t('邮箱'), 'url' => _t('网址')];
-                $scopeText[] = $scopeMap[$scope] ?? $scope;
-            }
-            ?>
-            <div class="commentaudit-card">
-                <h3><?php _e('基础与本地规则概览'); ?></h3>
-                <p class="commentaudit-desc"><?php _e('基础连接、本地规则和 AI 阈值已集中到插件原生设置页；这里只做只读概览。'); ?></p>
-                <table class="commentaudit-table">
-                    <tbody>
-                    <tr><th><?php _e('DeepSeek 模型'); ?></th><td><?php echo $h($plugin['deepseekModel']); ?></td></tr>
-                    <tr><th><?php _e('API Key'); ?></th><td><?php echo $plugin['deepseekApiKey'] !== '' ? _t('已配置') : _t('未配置'); ?></td></tr>
-                    <tr><th><?php _e('明确违禁词 / 疑似词'); ?></th><td><?php echo count(WordFilter::lines($plugin['blockWords'])); ?> / <?php echo count(WordFilter::lines($plugin['suspectWords'])); ?></td></tr>
-                    <tr><th><?php _e('词表作用域'); ?></th><td><?php echo $scopeText ? $h(implode('、', $scopeText)) : _t('未选择'); ?></td></tr>
-                    <tr><th><?php _e('IP / 邮箱 / 网址黑名单'); ?></th><td><?php echo count(WordFilter::lines($plugin['ipBlacklist'])); ?> / <?php echo count(WordFilter::lines($plugin['emailBlacklist'])); ?> / <?php echo count(WordFilter::lines($plugin['urlBlacklist'])); ?></td></tr>
-                    <tr><th><?php _e('本地预检'); ?></th><td><?php echo _t('IP %s 条 / %s 秒；链接上限 %s', (int) $plugin['ipRateLimit'], (int) $plugin['ipRateWindow'], (int) $plugin['linkLimit']); ?></td></tr>
-                    <tr><th><?php _e('三档阈值'); ?></th><td><?php echo $h($plugin['thresholdNew']); ?> / <?php echo $h($plugin['thresholdNormal']); ?> / <?php echo $h($plugin['thresholdTrusted']); ?></td></tr>
-                    <tr><th><?php _e('评论列表增强'); ?></th><td><?php echo !empty($plugin['advancedCommentList']) ? _t('已开启') : _t('未开启'); ?></td></tr>
-                    </tbody>
-                </table>
-                <div class="commentaudit-actions">
-                    <a class="btn primary" href="<?php echo $h($pluginSettingsUrl); ?>"><?php _e('打开插件设置页编辑基础与本地规则'); ?></a>
-                </div>
-            </div>
-
-            <div class="commentaudit-card">
-                <h3><?php _e('高级功能'); ?></h3>
-                <p class="commentaudit-desc"><?php _e('审核规则与日志面板只保留高级工具和运行结果，避免与插件基础设置重复。'); ?></p>
-                <div class="commentaudit-actions">
-                    <a class="btn" href="<?php echo $h($tabUrl('reputation')); ?>"><?php _e('信誉管理'); ?></a>
-                    <a class="btn" href="<?php echo $h($tabUrl('logs')); ?>"><?php _e('审核日志'); ?></a>
-                    <a class="btn" href="<?php echo $h($tabUrl('test')); ?>"><?php _e('测试工具'); ?></a>
-                    <a class="btn" href="<?php echo $h($tabUrl('advanced')); ?>"><?php _e('高级设置'); ?></a>
-                </div>
-            </div>
-
-        <?php elseif ($tab === 'rules'): ?>
-            <form method="post" action="<?php echo $h($actionUrl('save-rules')); ?>">
-                <div class="commentaudit-card">
-                    <h3><?php _e('词表'); ?></h3>
-                    <p class="commentaudit-desc"><?php _e('明确违禁词命中直接拒绝；疑似词只作为 AI 的参考信号，不会直接拦截。'); ?></p>
-                    <div class="commentaudit-grid">
-                        <div class="commentaudit-field">
-                            <label><?php _e('明确违禁词'); ?></label>
-                            <textarea name="blockWords" rows="10" placeholder="<?php _e('每行一个词'); ?>"><?php echo $h($plugin['blockWords']); ?></textarea>
-                        </div>
-                        <div class="commentaudit-field">
-                            <label><?php _e('疑似敏感词'); ?></label>
-                            <textarea name="suspectWords" rows="10" placeholder="<?php _e('每行一个词'); ?>"><?php echo $h($plugin['suspectWords']); ?></textarea>
-                        </div>
-                    </div>
-                    <div class="commentaudit-field commentaudit-checkboxes">
-                        <label><?php _e('作用域'); ?></label>
-                        <?php $scopes = is_array($plugin['wordScopes']) ? $plugin['wordScopes'] : []; ?>
-                        <label><input type="checkbox" name="wordScopes[]" value="text"<?php if (in_array('text', $scopes, true)): ?> checked<?php endif; ?>> <?php _e('评论内容'); ?></label>
-                        <label><input type="checkbox" name="wordScopes[]" value="author"<?php if (in_array('author', $scopes, true)): ?> checked<?php endif; ?>> <?php _e('昵称'); ?></label>
-                        <label><input type="checkbox" name="wordScopes[]" value="mail"<?php if (in_array('mail', $scopes, true)): ?> checked<?php endif; ?>> <?php _e('邮箱'); ?></label>
-                        <label><input type="checkbox" name="wordScopes[]" value="url"<?php if (in_array('url', $scopes, true)): ?> checked<?php endif; ?>> <?php _e('网址'); ?></label>
-                    </div>
-                </div>
-
-                <div class="commentaudit-card">
-                    <h3><?php _e('黑名单'); ?></h3>
-                    <div class="commentaudit-grid">
-                        <div class="commentaudit-field">
-                            <label><?php _e('IP 黑名单'); ?></label>
-                            <textarea name="ipBlacklist" rows="6" placeholder="1.2.3.4&#10;1.2.3.0/24"><?php echo $h($plugin['ipBlacklist']); ?></textarea>
-                            <span class="description"><?php _e('每行一个 IP 或 CIDR。'); ?></span>
-                        </div>
-                        <div class="commentaudit-field">
-                            <label><?php _e('邮箱黑名单'); ?></label>
-                            <textarea name="emailBlacklist" rows="6" placeholder="spam@example.com&#10;*@spam.com"><?php echo $h($plugin['emailBlacklist']); ?></textarea>
-                            <span class="description"><?php _e('每行一个邮箱或域名。'); ?></span>
-                        </div>
-                    </div>
-                    <div class="commentaudit-field">
-                        <label><?php _e('网址黑名单'); ?></label>
-                        <textarea name="urlBlacklist" rows="6" placeholder="spam.com&#10;*.spam.com&#10;https://spam.com/path"><?php echo $h($plugin['urlBlacklist']); ?></textarea>
-                        <span class="description"><?php _e('支持域名、子域名和 URL 前缀；评论正文与评论者网址都会检查。'); ?></span>
-                    </div>
-                </div>
-
-                <div class="commentaudit-card">
-                    <h3><?php _e('本地预检'); ?></h3>
-                    <div class="commentaudit-grid-3">
-                        <div class="commentaudit-field">
-                            <label><?php _e('同一 IP 评论数上限'); ?></label>
-                            <input type="number" name="ipRateLimit" min="0" value="<?php echo (int) $plugin['ipRateLimit']; ?>">
-                        </div>
-                        <div class="commentaudit-field">
-                            <label><?php _e('统计窗口（秒）'); ?></label>
-                            <input type="number" name="ipRateWindow" min="60" value="<?php echo (int) $plugin['ipRateWindow']; ?>">
-                        </div>
-                        <div class="commentaudit-field">
-                            <label><?php _e('链接数量上限'); ?></label>
-                            <input type="number" name="linkLimit" min="0" value="<?php echo (int) $plugin['linkLimit']; ?>">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="commentaudit-actions">
-                    <button type="submit" class="btn primary"><?php _e('保存本地规则'); ?></button>
-                </div>
-            </form>
-
-        <?php elseif ($tab === 'deepseek'): ?>
-            <form method="post" action="<?php echo $h($actionUrl('save-deepseek')); ?>">
-                <div class="commentaudit-card">
-                    <h3><?php _e('连接信息'); ?></h3>
-                    <p class="commentaudit-desc"><?php _e('API Key、模型、Base URL、超时、SSL 和调试日志已移动到插件原生设置页。'); ?></p>
-                    <table class="commentaudit-table">
-                        <tbody>
-                        <tr><th><?php _e('API Key'); ?></th><td><?php echo $plugin['deepseekApiKey'] !== '' ? _t('已配置') : _t('未配置'); ?></td></tr>
-                        <tr><th><?php _e('模型'); ?></th><td><?php echo $h($plugin['deepseekModel']); ?></td></tr>
-                        <tr><th><?php _e('Base URL'); ?></th><td><?php echo $h($plugin['deepseekBaseUrl']); ?></td></tr>
-                        <tr><th><?php _e('超时 / 最大 token'); ?></th><td><?php echo (int) $plugin['deepseekTimeout']; ?>s / <?php echo (int) $plugin['deepseekMaxTokens']; ?></td></tr>
-                        <tr><th><?php _e('SSL / 调试'); ?></th><td><?php echo !empty($plugin['deepseekSslVerify']) ? _t('开启') : _t('关闭'); ?> / <?php echo !empty($plugin['deepseekDebug']) ? _t('开启') : _t('关闭'); ?></td></tr>
-                        </tbody>
-                    </table>
-                    <div class="commentaudit-actions">
-                        <a class="btn primary" href="<?php echo $h($pluginSettingsUrl); ?>"><?php _e('在插件设置页修改连接信息'); ?></a>
-                        <button type="button" class="btn" id="commentaudit-test-connection"
-                                data-url="<?php echo $h($actionUrl('test-connection')); ?>"><?php _e('测试连接'); ?></button>
-                    </div>
-                    <pre id="commentaudit-connection-result" class="commentaudit-result"><?php _e('尚未测试'); ?></pre>
-                </div>
-
-                <div class="commentaudit-card">
-                    <h3><?php _e('审核阈值'); ?></h3>
-                    <p class="commentaudit-desc"><?php _e('AI 判定 block 且置信度达到阈值时直接拒绝；低于阈值按风险类别和信誉处理。'); ?></p>
-                    <div class="commentaudit-grid-3">
-                        <div class="commentaudit-field">
-                            <label><?php _e('新用户'); ?></label>
-                            <input type="number" step="0.05" min="0.1" max="1" name="thresholdNew" value="<?php echo $h($plugin['thresholdNew']); ?>">
-                        </div>
-                        <div class="commentaudit-field">
-                            <label><?php _e('普通用户'); ?></label>
-                            <input type="number" step="0.05" min="0.1" max="1" name="thresholdNormal" value="<?php echo $h($plugin['thresholdNormal']); ?>">
-                        </div>
-                        <div class="commentaudit-field">
-                            <label><?php _e('老访客'); ?></label>
-                            <input type="number" step="0.05" min="0.1" max="1" name="thresholdTrusted" value="<?php echo $h($plugin['thresholdTrusted']); ?>">
-                        </div>
-                    </div>
-                    <div class="commentaudit-grid">
-                        <div class="commentaudit-field">
-                            <label><?php _e('AI 失败策略'); ?></label>
-                            <input type="text" value="<?php _e('转待审（固定）'); ?>" disabled>
-                        </div>
-                        <div class="commentaudit-field">
-                            <label><?php _e('缓存天数'); ?></label>
-                            <input type="number" name="cacheTtl" min="1" max="30" value="<?php echo (int) $plugin['cacheTtl']; ?>">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="commentaudit-actions">
-                    <button type="submit" class="btn primary"><?php _e('保存 DeepSeek 设置'); ?></button>
-                </div>
-            </form>
-
-            <form method="post" action="<?php echo $h($actionUrl('clear-cache')); ?>" class="commentaudit-actions">
-                <button type="submit" class="btn"><?php _e('清空 AI 缓存'); ?></button>
-            </form>
-
-            <script>
-            (function () {
-                var button = document.getElementById('commentaudit-test-connection');
-                var result = document.getElementById('commentaudit-connection-result');
-                if (!button || !result) return;
-                button.addEventListener('click', function () {
-                    var url = button.getAttribute('data-url');
-                    if (!url) return;
-                    button.disabled = true;
-                    result.textContent = '<?php _e('测试中...'); ?>';
-                    fetch(url, {method: 'POST', credentials: 'same-origin'})
-                        .then(function (response) { return response.json(); })
-                        .then(function (data) {
-                            result.textContent = JSON.stringify(data, null, 2);
-                            button.disabled = false;
-                        })
-                        .catch(function (error) {
-                            result.textContent = '<?php _e('测试失败：'); ?>' + error;
-                            button.disabled = false;
-                        });
-                });
-            })();
-            </script>
 
         <?php elseif ($tab === 'reputation'): ?>
             <?php
@@ -519,9 +214,10 @@ body.dark .commentaudit-wrap,
             ?>
             <div class="commentaudit-card">
                 <h3><?php _e('信誉查询'); ?></h3>
-                <form method="get" action="<?php echo $h($options->adminUrl($panelBase, true)); ?>">
+                <form class="commentaudit-search" method="get" action="<?php echo $h($options->adminUrl('extending.php', true)); ?>">
+                    <input type="hidden" name="panel" value="CommentAudit/panel.php">
                     <input type="hidden" name="tab" value="reputation">
-                    <input type="text" name="q" value="<?php echo $h($keyword); ?>" placeholder="<?php _e('邮箱 / 昵称 / IP'); ?>">
+                    <input aria-label="<?php _e('搜索访客'); ?>" type="search" name="q" value="<?php echo $h($keyword); ?>" placeholder="<?php _e('邮箱 / 昵称 / IP'); ?>">
                     <button type="submit" class="btn"><?php _e('搜索'); ?></button>
                 </form>
                 <p class="commentaudit-desc"><?php _e('新用户：通过 0 条；普通用户：通过 1–2 条；老访客：通过 ≥3 条且 90 天无 spam。'); ?></p>
@@ -544,7 +240,7 @@ body.dark .commentaudit-wrap,
                                     <td class="commentaudit-reputation-action" data-label="<?php _e('操作'); ?>">
                                         <form method="post" action="<?php echo $h($actionUrl('set-trust')); ?>" class="commentaudit-trust-form">
                                             <input type="hidden" name="identity_hash" value="<?php echo $h($row['identity_hash']); ?>">
-                                            <select name="mode">
+                                            <select name="mode" aria-label="<?php _e('信誉模式'); ?>">
                                                 <option value="whitelist"><?php _e('白名单'); ?></option>
                                                 <option value="auto"><?php _e('恢复自动'); ?></option>
                                             </select>
@@ -575,11 +271,12 @@ body.dark .commentaudit-wrap,
             ?>
             <div class="commentaudit-card">
                 <h3><?php _e('审核日志'); ?></h3>
-                <form method="get" action="<?php echo $h($options->adminUrl($panelBase, true)); ?>" class="commentaudit-grid-3">
+                <form method="get" action="<?php echo $h($options->adminUrl('extending.php', true)); ?>" class="commentaudit-grid-3">
+                    <input type="hidden" name="panel" value="CommentAudit/panel.php">
                     <input type="hidden" name="tab" value="logs">
                     <div class="commentaudit-field">
-                        <label><?php _e('决策'); ?></label>
-                        <select name="decision">
+                        <label for="ca-filter-decision"><?php _e('决策'); ?></label>
+                        <select id="ca-filter-decision" name="decision">
                             <option value=""><?php _e('全部'); ?></option>
                             <?php foreach (['approved', 'waiting', 'rejected', 'spam'] as $item): ?>
                                 <option value="<?php echo $h($item); ?>"<?php if ($filters['decision'] === $item): ?> selected<?php endif; ?>><?php echo $h($decisionLabel($item)); ?></option>
@@ -587,8 +284,8 @@ body.dark .commentaudit-wrap,
                         </select>
                     </div>
                     <div class="commentaudit-field">
-                        <label><?php _e('信誉'); ?></label>
-                        <select name="trust_level">
+                        <label for="ca-filter-trust_level"><?php _e('信誉'); ?></label>
+                        <select id="ca-filter-trust_level" name="trust_level">
                             <option value=""><?php _e('全部'); ?></option>
                             <?php foreach (['new', 'normal', 'trusted', 'whitelist'] as $item): ?>
                                 <option value="<?php echo $h($item); ?>"<?php if ($filters['trust_level'] === $item): ?> selected<?php endif; ?>><?php echo $h($trustLabel($item)); ?></option>
@@ -596,8 +293,8 @@ body.dark .commentaudit-wrap,
                         </select>
                     </div>
                     <div class="commentaudit-field">
-                        <label><?php _e('关键词'); ?></label>
-                        <input type="text" name="keyword" value="<?php echo $h($filters['keyword']); ?>" placeholder="<?php _e('作者 / 邮箱 / IP / AI 原因'); ?>">
+                        <label for="ca-filter-keyword"><?php _e('关键词'); ?></label>
+                        <input type="text" id="ca-filter-keyword" name="keyword" value="<?php echo $h($filters['keyword']); ?>" placeholder="<?php _e('作者 / 邮箱 / IP / AI 原因'); ?>">
                     </div>
                     <div class="commentaudit-actions">
                         <button type="submit" class="btn"><?php _e('筛选'); ?></button>
@@ -658,9 +355,7 @@ body.dark .commentaudit-wrap,
                 </table>
             </div>
 
-            <div id="commentaudit-log-modal" class="commentaudit-modal" hidden>
-                <div class="commentaudit-modal-backdrop" data-commentaudit-close></div>
-                <div class="commentaudit-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="commentaudit-log-modal-title">
+            <dialog id="commentaudit-log-modal" class="commentaudit-modal" aria-labelledby="commentaudit-log-modal-title">
                     <div class="commentaudit-modal-head">
                         <h3 id="commentaudit-log-modal-title"><?php _e('审核详情'); ?></h3>
                         <button type="button" class="commentaudit-modal-close" data-commentaudit-close aria-label="<?php _e('关闭'); ?>">×</button>
@@ -686,8 +381,7 @@ body.dark .commentaudit-wrap,
                             </tbody>
                         </table>
                     </div>
-                </div>
-            </div>
+            </dialog>
 
             <script>
             (function () {
@@ -741,13 +435,10 @@ body.dark .commentaudit-wrap,
                         return;
                     }
                     lastFocus = button;
-                    modal.hidden = false;
-                    document.body.classList.add('commentaudit-modal-open');
+                    modal.showModal();
                 }
                 function closeModal() {
-                    modal.hidden = true;
-                    document.body.classList.remove('commentaudit-modal-open');
-                    if (lastFocus) lastFocus.focus();
+                    modal.close();
                 }
                 document.addEventListener('click', function (event) {
                     var button = event.target.closest ? event.target.closest('.commentaudit-log-detail') : null;
@@ -756,113 +447,60 @@ body.dark .commentaudit-wrap,
                         openModal(button);
                         return;
                     }
-                    if (event.target.closest && event.target.closest('[data-commentaudit-close]')) {
+                    if (event.target === modal || event.target.closest('[data-commentaudit-close]')) {
                         closeModal();
                     }
                 });
-                document.addEventListener('keydown', function (event) {
-                    if (event.key === 'Escape' && !modal.hidden) closeModal();
-                });
-            })();
-            </script>
-
-        <?php elseif ($tab === 'test'): ?>
-            <div class="commentaudit-card">
-                <h3><?php _e('规则测试'); ?></h3>
-                <p class="commentaudit-desc"><?php _e('测试不会写入评论，也不会写入审核日志。'); ?></p>
-                <form id="commentaudit-test-form" method="post" action="<?php echo $h($actionUrl('test')); ?>">
-                    <div class="commentaudit-grid">
-                        <div class="commentaudit-field">
-                            <label><?php _e('昵称'); ?></label>
-                            <input type="text" name="author" value="测试用户">
-                        </div>
-                        <div class="commentaudit-field">
-                            <label><?php _e('邮箱'); ?></label>
-                            <input type="text" name="mail" value="test@example.com">
-                        </div>
-                        <div class="commentaudit-field">
-                            <label><?php _e('IP'); ?></label>
-                            <input type="text" name="ip" value="127.0.0.1">
-                        </div>
-                        <div class="commentaudit-field">
-                            <label><?php _e('评论者网址'); ?></label>
-                            <input type="text" name="url" value="">
-                        </div>
-                    </div>
-                    <div class="commentaudit-field">
-                        <label><?php _e('评论内容'); ?></label>
-                        <textarea name="text" rows="5" required>这文章写得不错，学习了。</textarea>
-                    </div>
-                    <div class="commentaudit-grid">
-                        <div class="commentaudit-field">
-                            <label><?php _e('文章标题'); ?></label>
-                            <input type="text" name="title" value="测试文章">
-                        </div>
-                        <div class="commentaudit-field">
-                            <label><?php _e('文章分类'); ?></label>
-                            <input type="text" name="category" value="">
-                        </div>
-                    </div>
-                    <div class="commentaudit-field">
-                        <label><?php _e('文章摘要'); ?></label>
-                        <textarea name="excerpt" rows="2"></textarea>
-                    </div>
-                    <div class="commentaudit-field">
-                        <label><?php _e('文章标签（逗号分隔）'); ?></label>
-                        <input type="text" name="tags" value="">
-                    </div>
-                    <div class="commentaudit-actions">
-                        <button type="submit" class="btn primary"><?php _e('运行测试'); ?></button>
-                    </div>
-                </form>
-                <pre id="commentaudit-test-result" class="commentaudit-result"><?php _e('等待测试...'); ?></pre>
-            </div>
-            <script>
-            (function () {
-                var form = document.getElementById('commentaudit-test-form');
-                var result = document.getElementById('commentaudit-test-result');
-                if (!form || !result) return;
-                form.addEventListener('submit', function (event) {
-                    event.preventDefault();
-                    result.textContent = '<?php _e('测试中...'); ?>';
-                    fetch(form.action, {method: 'POST', body: new FormData(form), credentials: 'same-origin'})
-                        .then(function (response) { return response.json(); })
-                        .then(function (data) {
-                            result.textContent = JSON.stringify(data, null, 2);
-                        })
-                        .catch(function (error) {
-                            result.textContent = '<?php _e('测试失败：'); ?>' + error;
-                        });
+                modal.addEventListener('close', function () {
+                    if (lastFocus) lastFocus.focus();
                 });
             })();
             </script>
 
         <?php elseif ($tab === 'advanced'): ?>
             <form method="post" action="<?php echo $h($actionUrl('save-advanced')); ?>">
-                <div class="commentaudit-card">
-                    <h3><?php _e('高级设置'); ?></h3>
-                    <div class="commentaudit-field commentaudit-checkboxes">
-                        <label>
-                            <input type="checkbox" name="advancedCommentList" value="1"<?php if (!empty($plugin['advancedCommentList'])): ?> checked<?php endif; ?>>
-                            <?php _e('启用评论列表增强'); ?>
-                        </label>
-                        <p class="description"><?php _e('默认关闭。开启后会在 Typecho 原生评论列表显示审核原因、AI 详情和快捷拉黑；不改核心文件，关闭后恢复原样。'); ?></p>
-                    </div>
-                    <div class="commentaudit-field">
-                        <label><?php _e('审核日志保留天数'); ?></label>
-                        <input type="number" name="logRetention" min="1" max="3650" value="<?php echo (int) $plugin['logRetention']; ?>">
-                    </div>
-                    <div class="commentaudit-actions">
-                        <button type="submit" class="btn primary"><?php _e('保存高级设置'); ?></button>
-                    </div>
+                <div class="commentaudit-grid">
+                    <section class="commentaudit-card">
+                        <h3><?php _e('评论列表'); ?></h3>
+                        <div class="commentaudit-field">
+                            <label class="commentaudit-toggle">
+                                <input type="checkbox" name="advancedCommentList" value="1"<?php if (!empty($plugin['advancedCommentList'])): ?> checked<?php endif; ?>>
+                                <?php _e('启用评论列表增强'); ?>
+                            </label>
+                            <p class="description"><?php _e('在原生评论列表显示审核理由、信誉、AI 置信度和快捷拉黑操作。'); ?></p>
+                        </div>
+                    </section>
+                    <section class="commentaudit-card">
+                        <h3><?php _e('数据保留'); ?></h3>
+                        <div class="commentaudit-field">
+                            <label for="ca-log-retention"><?php _e('审核日志保留（天）'); ?></label>
+                            <input id="ca-log-retention" type="number" name="logRetention" min="1" max="3650" required value="<?php echo (int) $plugin['logRetention']; ?>">
+                            <p class="description"><?php _e('打开概览时会清理超期日志。默认保留 90 天。'); ?></p>
+                        </div>
+                        <div class="commentaudit-field">
+                            <label for="ca-cache-ttl"><?php _e('新增 AI 缓存有效期（天）'); ?></label>
+                            <input id="ca-cache-ttl" type="number" name="cacheTtl" min="1" required value="<?php echo (int) $plugin['cacheTtl']; ?>">
+                            <p class="description"><?php _e('保存后，新写入的缓存采用此有效期。默认 7 天。'); ?></p>
+                        </div>
+                    </section>
+                </div>
+                <div class="commentaudit-actions commentaudit-save">
+                    <button type="submit" class="btn primary"><?php _e('保存高级设置'); ?></button>
                 </div>
             </form>
+            <section class="commentaudit-card">
+                <h3><?php _e('缓存维护'); ?></h3>
+                <p class="commentaudit-desc"><?php _e('清空后，下次审核相同内容时会重新调用 AI。'); ?></p>
+                <form method="post" action="<?php echo $h($actionUrl('clear-cache')); ?>">
+                    <button type="submit" class="btn"><?php _e('清空 AI 缓存'); ?></button>
+                </form>
+            </section>
         <?php endif; ?>
     </div>
 </main>
 
 <?php
-include 'copyright.php';
-include 'common-js.php';
-include 'footer.php';
+require $adminPath . '/copyright.php';
+require $adminPath . '/common-js.php';
+require $adminPath . '/footer.php';
 ?>

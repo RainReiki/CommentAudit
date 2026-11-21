@@ -73,20 +73,20 @@ class DeepSeekClient
         $latency = (int) round((microtime(true) - $start) * 1000);
 
         if ($response['error'] !== '') {
-            self::debug($settings, 'http error status=' . $response['status'] . ' body=' . substr($response['body'], 0, 2000));
+            self::debug($settings, 'http error status=' . (int) $response['status']);
             self::recordFailure();
             return self::failure('ai_error', $latency);
         }
 
         $data = json_decode($response['body'], true);
         if (!is_array($data)) {
-            self::debug($settings, 'invalid json body=' . substr($response['body'], 0, 2000));
+            self::debug($settings, 'invalid response JSON');
             self::recordFailure();
             return self::failure('ai_error', $latency);
         }
 
         if (isset($data['error'])) {
-            self::debug($settings, 'api error body=' . substr($response['body'], 0, 2000));
+            self::debug($settings, 'API returned an error');
             self::recordFailure();
             return self::failure('ai_error', $latency);
         }
@@ -99,7 +99,7 @@ class DeepSeekClient
 
         $parsed = ResultParser::parse($content);
         if (!$parsed) {
-            self::debug($settings, 'parse error content=' . substr($content, 0, 2000));
+            self::debug($settings, 'could not parse the audit decision');
             self::recordFailure();
             return self::failure('ai_error', $latency);
         }
@@ -211,12 +211,7 @@ class DeepSeekClient
             return;
         }
 
-        $file = __TYPECHO_ROOT_DIR__ . '/usr/plugins/CommentAudit/debug.log';
-        @file_put_contents(
-            $file,
-            '[' . date('Y-m-d H:i:s') . '] ' . str_replace(["\r", "\n"], ' ', (string) $message) . "\n",
-            FILE_APPEND | LOCK_EX
-        );
+        error_log('[CommentAudit] ' . $message);
     }
 
     /**

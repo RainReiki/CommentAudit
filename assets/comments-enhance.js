@@ -71,10 +71,10 @@
     }
 
     function decideTarget(row) {
-        return row.querySelector('.comment-head') ||
+        return row.querySelector('.comment-body') ||
+            row.querySelector('.comment-head') ||
             row.querySelector('.comment-meta') ||
-            row.querySelector('.comment-body') ||
-            row;
+            row.querySelector('td:last-child');
     }
 
     function renderLog(row, log, comment) {
@@ -115,7 +115,8 @@
         var coid = rowCoId(row);
 
         function addBlacklistAction(label, handle) {
-            var link = element('span', 'commentaudit-enhance-link', label);
+            var link = element('button', 'commentaudit-enhance-link', label);
+            link.type = 'button';
             link.addEventListener('click', function (event) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -149,14 +150,19 @@
                 }
                 body.append('handle', handle);
 
+                link.disabled = true;
                 fetch(config.blacklistUrl, {
                     method: 'POST',
                     credentials: 'same-origin',
                     headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'},
                     body: body.toString()
-                }).then(function () {
+                }).then(function (response) {
+                    if (!response.ok) {
+                        throw new Error('CommentAudit request failed');
+                    }
                     window.location.reload();
                 }).catch(function () {
+                    link.disabled = false;
                     window.alert('操作失败，请稍后重试。');
                 });
             });
