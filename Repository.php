@@ -552,7 +552,7 @@ class Repository
         }
 
         $select->order('id', Db::SORT_DESC)->limit(max(1, (int) $limit));
-        return $db->fetchAll($select);
+        return array_map([Logger::class, 'expandLog'], $db->fetchAll($select));
     }
 
     /**
@@ -571,7 +571,7 @@ class Repository
                 ->limit(1)
         );
 
-        return $row ?: null;
+        return $row ? Logger::expandLog($row) : null;
     }
 
     /**
@@ -598,7 +598,7 @@ class Repository
         foreach ($rows as $row) {
             $coid = (int) $row['coid'];
             if (!isset($result[$coid])) {
-                $result[$coid] = $row;
+                $result[$coid] = Logger::expandLog($row);
             }
         }
 

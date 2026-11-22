@@ -15,7 +15,7 @@ class ResultParser
      * @param string $content
      * @return array|null
      */
-    public static function parse($content)
+    public static function parse($content, bool $requireIdentity = false)
     {
         $json = self::extractJson((string) $content);
         if ($json === '') {
@@ -57,6 +57,29 @@ class ResultParser
         $confidence = (float) ($data['confidence'] ?? 0);
         $confidence = max(0, min(1, $confidence));
 
+        $identity = null;
+        if (isset($data['identity']) && is_array($data['identity'])) {
+            $raw = $data['identity'];
+            $risk = $raw['risk'] ?? null;
+            $categoryName = $raw['category'] ?? null;
+            if (!in_array($risk, ['low', 'medium', 'high'], true)
+                || !in_array($categoryName, ['none', 'name_confusion', 'profile_conflict', 'possible_impersonation'], true)
+                || !is_array($raw['sources'] ?? null) || !is_array($raw['evidence'] ?? null)) {
+                return null;
+            }
+            $sources = array_values(array_intersect([
+                'site_name_similarity', 'historical_name_similarity', 'history_profile_conflict',
+                'history_spam_pattern', 'placeholder_email', 'unverified_website',
+            ], array_filter($raw['sources'], 'is_string')));
+            $evidence = array_slice(array_values(array_filter(array_map(
+                static fn ($item) => is_string($item) ? mb_substr(trim($item), 0, 160, 'UTF-8') : '',
+                $raw['evidence']
+            ))), 0, 3);
+            $identity = ['risk' => $risk, 'category' => $categoryName, 'sources' => $sources, 'evidence' => $evidence];
+        } elseif ($requireIdentity) {
+            return null;
+        }
+
         return [
             'decision' => $decision,
             'category' => $category,
@@ -66,6 +89,7 @@ class ResultParser
             'faithful' => self::boolValue($data['faithful'] ?? true),
             'confidence' => $confidence,
             'reason' => trim((string) ($data['reason'] ?? '')),
+            'identity' => $identity,
         ];
     }
 

@@ -39,7 +39,7 @@ class Logger
             'ai_category' => isset($ai['category']) ? (string) $ai['category'] : null,
             'ai_severity' => isset($ai['severity']) ? (string) $ai['severity'] : null,
             'ai_confidence' => isset($ai['confidence']) ? (float) $ai['confidence'] : 0,
-            'ai_reason' => isset($ai['reason']) ? (string) $ai['reason'] : (string) ($result['reason'] ?? ''),
+            'ai_reason' => self::storedReason($ai, (string) ($result['reason'] ?? '')),
             'on_topic' => !empty($ai['on_topic']) ? 1 : 0,
             'faithful' => !empty($ai['faithful']) ? 1 : 0,
             'threat_type' => isset($ai['threat_type']) ? (string) $ai['threat_type'] : null,
@@ -49,6 +49,64 @@ class Logger
             'manual_by' => 0,
             'created' => time(),
         ]));
+    }
+
+    /**
+     * Keep structured identity evidence in the existing text field so old installations need no schema migration.
+     */
+    private static function storedReason(array $ai, string $fallback): string
+    {
+        $reason = (string) ($ai['reason'] ?? $fallback);
+        if (!is_array($ai['identity'] ?? null) && !is_array($ai['conversation'] ?? null)) {
+            return $reason;
+        }
+        return json_encode([
+            '_commentaudit' => 'identity-v1',
+            'reason' => $reason,
+            'identity' => $ai['identity'] ?? null,
+            'conversation' => $ai['conversation'] ?? null,
+        ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    }
+
+    public static function expandLog(array $row): array
+    {
+        $details = json_decode((string) ($row['ai_reason'] ?? ''), true);
+        $row['identity'] = null;
+        $row['conversation'] = null;
+        if (is_array($details) && ($details['_commentaudit'] ?? '') === 'identity-v1'
+            && is_string($details['reason'] ?? null)) {
+            $row['ai_reason'] = $details['reason'];
+            $row['identity'] = is_array($details['identity'] ?? null) ? $details['identity'] : null;
+            $row['conversation'] = is_array($details['conversation'] ?? null) ? $details['conversation'] : null;
+        }
+        return $row;
+    }
+
+    public static function identitySummary(?array $identity): string
+    {
+        if ($identity === null) {
+            return _t('未记录');
+        }
+        $risks = ['low' => _t('低'), 'medium' => _t('中'), 'high' => _t('高')];
+        $categories = [
+            'none' => _t('未发现明确疑点'), 'name_confusion' => _t('昵称混淆'),
+            'profile_conflict' => _t('身份组合不一致'), 'possible_impersonation' => _t('疑似冒用身份'),
+        ];
+        return ($risks[$identity['risk'] ?? ''] ?? _t('未知')) . ' · '
+            . ($categories[$identity['category'] ?? ''] ?? _t('需复核'));
+    }
+
+    public static function conversationSummary(?array $context): string
+    {
+        if ($context === null) {
+            return _t('旧记录未保存对话上下文');
+        }
+        if (empty($context['is_reply'])) {
+            return _t('一级评论 · 参考文章');
+        }
+        $count = count($context['ancestors'] ?? []);
+        return _t('回复评论 · 父评论 #%d · 读取 %d 条上级对话', (int) ($context['parent_id'] ?? 0), $count)
+            . (!empty($context['incomplete']) ? _t('（上下文不完整）') : '');
     }
 
     /**
@@ -108,6 +166,7 @@ class Logger
             'history_link_limit' => '链接数量超过上限',
             'history_local_pass' => '未命中本地规则',
             'history_moderate_abuse' => '疑似中度辱骂',
+            'identity_review' => '身份信息存在疑点，转人工审核',
         ];
 
         return $map[$code] ?? $code;

@@ -3,6 +3,8 @@
 namespace TypechoPlugin\CommentAudit\Ai;
 
 use TypechoPlugin\CommentAudit\Repository;
+use TypechoPlugin\CommentAudit\Rule\IdentityContext;
+use TypechoPlugin\CommentAudit\Rule\ConversationContext;
 
 if (!defined('__TYPECHO_ROOT_DIR__')) {
     exit;
@@ -32,6 +34,20 @@ class DeepSeekClient
         $apiKey = trim((string) ($settings['deepseekApiKey'] ?? ''));
         if ($apiKey === '') {
             return self::failure('ai_missing_key');
+        }
+
+        try {
+            $features['conversation_context'] = ConversationContext::build($comment);
+        } catch (\Throwable $e) {
+            return self::failure('ai_error', 0, _t('暂时无法读取回复的对话记录，请稍后重试。'));
+        }
+        $identityEnabled = !empty($settings['identityProtection'] ?? 1);
+        if ($identityEnabled) {
+            try {
+                $features['identity_context'] = IdentityContext::build($comment);
+            } catch (\Throwable $e) {
+                return self::failure('ai_error', 0, _t('暂时无法读取身份检查所需的站点记录，请稍后重试。'));
+            }
         }
 
         $cacheKey = PromptBuilder::cacheKey($model, $comment, $article, $features);
@@ -107,7 +123,7 @@ class DeepSeekClient
             $content = $data['choices'][0]['message']['content'];
         }
 
-        $parsed = ResultParser::parse($content);
+        $parsed = ResultParser::parse($content, $identityEnabled);
         if (!$parsed) {
             self::debug($settings, 'could not parse the audit decision');
             if (!$preview) {
@@ -119,9 +135,29 @@ class DeepSeekClient
                 : _t('模型没有返回可用的审核结果，请检查模型设置后重试。'));
         }
 
+        if ($identityEnabled && is_array($parsed['identity'] ?? null)) {
+            $context = $features['identity_context'];
+            $allowed = ['site_name_similarity', 'placeholder_email', 'unverified_website'];
+            if ($context['related_profiles']) {
+                $allowed[] = 'historical_name_similarity';
+                $allowed[] = 'history_profile_conflict';
+                if (array_sum(array_column($context['related_profiles'], 'spam')) > 0) {
+                    $allowed[] = 'history_spam_pattern';
+                }
+            }
+            $parsed['identity']['sources'] = array_values(array_intersect($allowed, $parsed['identity']['sources']));
+            if (!array_intersect($parsed['identity']['sources'], [
+                'site_name_similarity', 'historical_name_similarity', 'history_profile_conflict', 'history_spam_pattern',
+            ]) || !$parsed['identity']['evidence'] || $parsed['identity']['category'] === 'none'
+                || $context['current']['authenticated_site_owner']) {
+                $parsed['identity'] = ['risk' => 'low', 'category' => 'none', 'sources' => [], 'evidence' => []];
+            }
+        }
+
         $parsed['latency_ms'] = $latency;
         $parsed['tokens'] = (int) ($data['usage']['total_tokens'] ?? 0);
         $parsed['cached'] = false;
+        $parsed['conversation'] = $features['conversation_context'];
 
         if ($preview) {
             return $parsed;

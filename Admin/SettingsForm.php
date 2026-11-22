@@ -71,6 +71,8 @@ final class SettingsForm
                 'linkLimit' => [Number::class, _t('链接数量上限'), _t('超过上限后会标记为疑似，交给 AI 判断。')],
             ]],
             'policy' => [_t('AI 审核阈值'), _t('AI 判定拦截且达到对应置信度时直接拒绝。AI 调用失败时转待审。'), [
+                'identityProtection' => [Radio::class, _t('自动检查身份信息'),
+                    _t('自动结合站点名称、昵称、邮箱前缀、网址域名和相关历史记录检查身份疑点。可疑评论转待审，无需录入博友名单。'), $enabled],
                 'thresholdNew' => [Number::class, _t('新用户'), _t('默认 0.7。')],
                 'thresholdNormal' => [Number::class, _t('普通用户'), _t('默认 0.8。')],
                 'thresholdTrusted' => [Number::class, _t('老访客'), _t('默认 0.9。')],
@@ -150,7 +152,7 @@ final class SettingsForm
             }
         }
 
-        foreach (['deepseekSslVerify', 'deepseekDebug'] as $name) {
+        foreach (['deepseekSslVerify', 'deepseekDebug', 'identityProtection'] as $name) {
             $value = $submitted[$name] ?? null;
             if (in_array($value, ['0', '1', 0, 1], true)) {
                 $settings[$name] = (int) $value;

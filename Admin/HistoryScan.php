@@ -5,6 +5,7 @@ namespace TypechoPlugin\CommentAudit\Admin;
 use Typecho\Common;
 use Typecho\Db;
 use TypechoPlugin\CommentAudit\Engine;
+use TypechoPlugin\CommentAudit\Logger;
 
 if (!defined('__TYPECHO_ROOT_DIR__')) {
     exit;
@@ -72,6 +73,11 @@ final class HistoryScan
                 'suggestion' => $result['decision'],
                 'reason' => $result['reason'],
                 'aiReason' => Common::subStr((string) ($result['ai']['reason'] ?? ''), 0, 160),
+                'identitySummary' => isset($result['ai']['identity'])
+                    ? Logger::identitySummary($result['ai']['identity']) : '',
+                'identityEvidence' => $result['ai']['identity']['evidence'] ?? [],
+                'conversationSummary' => isset($result['ai']['conversation'])
+                    ? Logger::conversationSummary($result['ai']['conversation']) : '',
             ];
         }
 

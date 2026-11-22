@@ -337,6 +337,10 @@ require $adminPath . '/menu.php';
                                 'ai_severity' => (string) ($row['ai_severity'] ?? ''),
                                 'ai_confidence' => $row['ai_confidence'] !== null ? (float) $row['ai_confidence'] : null,
                                 'ai_reason' => (string) ($row['ai_reason'] ?? ''),
+                                'identity_summary' => Logger::identitySummary($row['identity']),
+                                'identity_evidence' => $row['identity']['evidence'] ?? [],
+                                'conversation_summary' => Logger::conversationSummary($row['conversation']),
+                                'conversation_ancestors' => $row['conversation']['ancestors'] ?? [],
                                 'on_topic' => (int) ($row['on_topic'] ?? 0),
                                 'faithful' => (int) ($row['faithful'] ?? 0),
                                 'threat_type' => (string) ($row['threat_type'] ?? ''),
@@ -377,6 +381,10 @@ require $adminPath . '/menu.php';
                             <tr><th><?php _e('AI 决策 / 类别'); ?></th><td id="commentaudit-detail-ai"></td></tr>
                             <tr><th><?php _e('AI 置信度 / 严重度'); ?></th><td id="commentaudit-detail-confidence"></td></tr>
                             <tr><th><?php _e('AI 原因'); ?></th><td id="commentaudit-detail-ai-reason"></td></tr>
+                            <tr><th><?php _e('审核上下文'); ?></th><td id="commentaudit-detail-conversation"></td></tr>
+                            <tr><th><?php _e('上级对话摘要'); ?></th><td id="commentaudit-detail-ancestors"></td></tr>
+                            <tr><th><?php _e('身份检查'); ?></th><td id="commentaudit-detail-identity"></td></tr>
+                            <tr><th><?php _e('身份检查依据'); ?></th><td id="commentaudit-detail-identity-evidence"></td></tr>
                             <tr><th><?php _e('主题相关 / 忠实'); ?></th><td id="commentaudit-detail-flags"></td></tr>
                             <tr><th><?php _e('威胁类型'); ?></th><td id="commentaudit-detail-threat"></td></tr>
                             <tr><th><?php _e('耗时 / tokens'); ?></th><td id="commentaudit-detail-cost"></td></tr>
@@ -401,6 +409,10 @@ require $adminPath . '/menu.php';
                     ai: document.getElementById('commentaudit-detail-ai'),
                     confidence: document.getElementById('commentaudit-detail-confidence'),
                     aiReason: document.getElementById('commentaudit-detail-ai-reason'),
+                    conversation: document.getElementById('commentaudit-detail-conversation'),
+                    ancestors: document.getElementById('commentaudit-detail-ancestors'),
+                    identity: document.getElementById('commentaudit-detail-identity'),
+                    identityEvidence: document.getElementById('commentaudit-detail-identity-evidence'),
                     flags: document.getElementById('commentaudit-detail-flags'),
                     threat: document.getElementById('commentaudit-detail-threat'),
                     cost: document.getElementById('commentaudit-detail-cost'),
@@ -423,6 +435,16 @@ require $adminPath . '/menu.php';
                     var confidence = data.ai_confidence === null ? '-' : Number(data.ai_confidence).toFixed(2);
                     fields.confidence.textContent = confidence + ' / ' + val(data.ai_severity);
                     fields.aiReason.textContent = val(data.ai_reason);
+                    fields.conversation.textContent = val(data.conversation_summary);
+                    fields.ancestors.textContent = Array.isArray(data.conversation_ancestors) && data.conversation_ancestors.length
+                        ? data.conversation_ancestors.map(function (item) {
+                            return '#' + item.id + ' ' + val(item.author, '匿名') + '：' + val(item.text)
+                                + (item.text_truncated ? '（已截取）' : '');
+                        }).join('\n') : '无';
+                    fields.ancestors.style.whiteSpace = 'pre-wrap';
+                    fields.identity.textContent = val(data.identity_summary, '未记录');
+                    fields.identityEvidence.textContent = Array.isArray(data.identity_evidence) && data.identity_evidence.length
+                        ? data.identity_evidence.join('；') : '无';
                     fields.flags.textContent = (Number(data.on_topic) ? '相关' : '不相关') + ' / ' + (Number(data.faithful) ? '忠实' : '不忠实');
                     fields.threat.textContent = val(data.threat_type);
                     fields.cost.textContent = (Number(data.latency_ms) ? data.latency_ms + 'ms' : '-') + ' / ' + (Number(data.tokens) || '-');

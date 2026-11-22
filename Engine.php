@@ -125,7 +125,17 @@ class Engine
         $ai = DeepSeekClient::audit($aiComment, $article, $features, $settings, $historical);
 
         // 4. 决策合并
-        return self::merge($ai, $trustLevel, $comment, $settings, $flags, $historical);
+        $result = self::merge($ai, $trustLevel, $comment, $settings, $flags, $historical);
+        $identity = $ai['identity'] ?? null;
+        if (!empty($settings['identityProtection'] ?? 1) && $result['decision'] === 'approved'
+            && is_array($identity) && in_array($identity['risk'], ['medium', 'high'], true)
+            && $identity['category'] !== 'none' && !empty($identity['evidence'])
+            && array_intersect($identity['sources'], [
+                'site_name_similarity', 'historical_name_similarity', 'history_profile_conflict', 'history_spam_pattern',
+            ])) {
+            return self::waiting('identity_review', $trustLevel, $ai, $flags);
+        }
+        return $result;
     }
 
     /**

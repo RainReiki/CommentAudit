@@ -76,7 +76,10 @@
         entry.querySelector('[data-scan-reason]').textContent =
             (result.deleted ? '已删除' : result.missing ? '评论已不存在' : '当前状态：' + statuses[result.status])
             + (result.handled ? ' · 已处理' : '') + ' · ' + result.reason
-            + (result.aiReason ? ' · ' + result.aiReason : '');
+            + (result.aiReason ? ' · ' + result.aiReason : '')
+            + (result.conversationSummary ? ' · ' + result.conversationSummary : '')
+            + (result.identitySummary ? ' · 身份检查：' + result.identitySummary : '')
+            + (result.identityEvidence && result.identityEvidence.length ? ' · ' + result.identityEvidence.join('；') : '');
 
         var checkbox = entry.querySelector('[data-scan-select]');
         var singleMode = entry.querySelector('[data-scan-single]');
