@@ -60,22 +60,59 @@ class ResultParser
         $identity = null;
         if (isset($data['identity']) && is_array($data['identity'])) {
             $raw = $data['identity'];
-            $risk = $raw['risk'] ?? null;
-            $categoryName = $raw['category'] ?? null;
-            if (!in_array($risk, ['low', 'medium', 'high'], true)
-                || !in_array($categoryName, ['none', 'name_confusion', 'profile_conflict', 'possible_impersonation'], true)
-                || !is_array($raw['sources'] ?? null) || !is_array($raw['evidence'] ?? null)) {
+            $scoreRaw = $raw['score'] ?? null;
+            $hasScore = is_numeric($scoreRaw);
+            $score = $hasScore ? max(0, min(10, (int) round((float) $scoreRaw))) : null;
+            $risk = strtolower(trim((string) ($raw['risk'] ?? '')));
+            $categoryName = strtolower(trim((string) ($raw['category'] ?? '')));
+            if (!$hasScore && !in_array($risk, ['low', 'medium', 'high'], true)) {
                 return null;
             }
+            if (!in_array($categoryName, ['none', 'name_confusion', 'profile_conflict', 'possible_impersonation'], true)) {
+                $categoryName = $hasScore && $score >= 3 ? 'profile_conflict' : 'none';
+            }
+            if ($hasScore) {
+                $risk = $score >= 6 ? 'high' : ($score >= 3 ? 'medium' : 'low');
+            } else {
+                $score = $risk === 'high' ? 7 : ($risk === 'medium' ? 4 : 0);
+            }
+            if ($score >= 3 && $categoryName === 'none') {
+                $categoryName = 'profile_conflict';
+            }
+
+            $sourcesRaw = $raw['sources'] ?? [];
+            if (is_string($sourcesRaw)) {
+                $sourcesRaw = preg_split('/[|,，、\s]+/u', $sourcesRaw) ?: [];
+            }
+            if (!is_array($sourcesRaw)) {
+                $sourcesRaw = [];
+            }
+
+            $evidenceRaw = $raw['evidence'] ?? [];
+            if (is_string($evidenceRaw)) {
+                $evidenceRaw = [$evidenceRaw];
+            }
+            if (!is_array($evidenceRaw)) {
+                $evidenceRaw = [];
+            }
+
             $sources = array_values(array_intersect([
                 'site_name_similarity', 'historical_name_similarity', 'history_profile_conflict',
-                'history_spam_pattern', 'placeholder_email', 'unverified_website',
-            ], array_filter($raw['sources'], 'is_string')));
+                'history_spam_pattern', 'placeholder_email', 'public_mailbox', 'platform_homepage',
+                'search_engine_homepage', 'shortened_website', 'brand_impersonation',
+                'profile_mismatch', 'unverified_website',
+            ], array_filter($sourcesRaw, 'is_string')));
             $evidence = array_slice(array_values(array_filter(array_map(
                 static fn ($item) => is_string($item) ? mb_substr(trim($item), 0, 160, 'UTF-8') : '',
-                $raw['evidence']
+                $evidenceRaw
             ))), 0, 3);
-            $identity = ['risk' => $risk, 'category' => $categoryName, 'sources' => $sources, 'evidence' => $evidence];
+            $identity = [
+                'risk' => $risk,
+                'score' => $score,
+                'category' => $categoryName,
+                'sources' => $sources,
+                'evidence' => $evidence,
+            ];
         } elseif ($requireIdentity) {
             return null;
         }

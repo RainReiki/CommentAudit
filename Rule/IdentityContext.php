@@ -87,6 +87,7 @@ final class IdentityContext
 
         $at = strrpos($mail, '@');
         $emailName = $at === false ? $mail : substr($mail, 0, $at);
+        $emailDomain = $at === false ? '' : strtolower(trim(substr($mail, $at + 1)));
         $authenticatedOwner = false;
         $authorId = (int) ($comment['authorId'] ?? 0);
         if ($authorId > 0) {
@@ -104,8 +105,10 @@ final class IdentityContext
             'current' => [
                 'nickname' => Common::subStr($author, 0, 60, ''),
                 'email_name' => Common::subStr($emailName, 0, 48, ''),
+                'email_domain' => Common::subStr($emailDomain, 0, 100, ''),
                 'email_format_valid' => $mail !== '' && filter_var($mail, FILTER_VALIDATE_EMAIL) !== false,
                 'website_host' => $host,
+                'website_is_homepage' => self::isHomepage($url),
                 'authenticated_site_owner' => $authenticatedOwner,
             ],
             'related_profiles' => array_values($profiles),
@@ -120,6 +123,15 @@ final class IdentityContext
         }
         $host = parse_url(strpos($url, '://') === false ? 'https://' . $url : $url, PHP_URL_HOST);
         return is_string($host) ? strtolower(Common::subStr($host, 0, 253, '')) : '';
+    }
+
+    private static function isHomepage(string $url): bool
+    {
+        if ($url === '') {
+            return false;
+        }
+        $path = parse_url(strpos($url, '://') === false ? 'https://' . $url : $url, PHP_URL_PATH);
+        return !is_string($path) || $path === '' || $path === '/';
     }
 
     private static function nameKey(string $name): string

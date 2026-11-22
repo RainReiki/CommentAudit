@@ -92,8 +92,14 @@ class Logger
             'none' => _t('未发现明确疑点'), 'name_confusion' => _t('昵称混淆'),
             'profile_conflict' => _t('身份组合不一致'), 'possible_impersonation' => _t('疑似冒用身份'),
         ];
-        return ($risks[$identity['risk'] ?? ''] ?? _t('未知')) . ' · '
+        $summary = ($risks[$identity['risk'] ?? ''] ?? _t('未知')) . ' · '
             . ($categories[$identity['category'] ?? ''] ?? _t('需复核'));
+
+        if (isset($identity['score'])) {
+            $summary .= _t('（%d 分）', (int) $identity['score']);
+        }
+
+        return $summary;
     }
 
     public static function conversationSummary(?array $context): string
@@ -167,6 +173,8 @@ class Logger
             'history_local_pass' => '未命中本地规则',
             'history_moderate_abuse' => '疑似中度辱骂',
             'identity_review' => '身份信息存在疑点，转人工审核',
+            'identity_local_risk' => '昵称、邮箱或网址存在风险组合，转人工审核',
+            'identity_high_risk' => '昵称、邮箱或网址风险很高，直接拒绝',
         ];
 
         return $map[$code] ?? $code;

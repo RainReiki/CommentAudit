@@ -72,7 +72,7 @@ final class SettingsForm
             ]],
             'policy' => [_t('AI 审核阈值'), _t('AI 判定拦截且达到对应置信度时直接拒绝。AI 调用失败时转待审。'), [
                 'identityProtection' => [Radio::class, _t('自动检查身份信息'),
-                    _t('自动结合站点名称、昵称、邮箱前缀、网址域名和相关历史记录检查身份疑点。可疑评论转待审，无需录入博友名单。'), $enabled],
+                    _t('AI 根据昵称、邮箱前缀与域名、网址域名与是否首页、站点身份和历史记录给出 0–10 分；本地只做占位邮箱、IP 网址等客观检查。最终分取较高值：3–5 分待审，6 分以上直接拒绝；无需录入博友名单。'), $enabled],
                 'thresholdNew' => [Number::class, _t('新用户'), _t('默认 0.7。')],
                 'thresholdNormal' => [Number::class, _t('普通用户'), _t('默认 0.8。')],
                 'thresholdTrusted' => [Number::class, _t('老访客'), _t('默认 0.9。')],

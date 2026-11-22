@@ -4,6 +4,7 @@ namespace TypechoPlugin\CommentAudit;
 
 use TypechoPlugin\CommentAudit\Ai\DeepSeekClient;
 use TypechoPlugin\CommentAudit\Rule\Blacklist;
+use TypechoPlugin\CommentAudit\Rule\IdentityRisk;
 use TypechoPlugin\CommentAudit\Rule\LocalPrecheck;
 use TypechoPlugin\CommentAudit\Rule\Trust;
 use TypechoPlugin\CommentAudit\Rule\WordFilter;
@@ -88,6 +89,14 @@ class Engine
             if (in_array('too_many_links', $flags, true)) {
                 return self::waiting('history_link_limit', $trustLevel);
             }
+            if (!empty($settings['identityProtection'] ?? 1)) {
+                $localIdentity = IdentityRisk::evaluate($comment);
+                if (IdentityRisk::rank($localIdentity['risk']) > 0) {
+                    return self::waiting('identity_local_risk', $trustLevel, [
+                        'identity' => IdentityRisk::merge(null, $localIdentity),
+                    ], $flags);
+                }
+            }
             return self::approved('history_local_pass', $trustLevel);
         }
 
@@ -100,7 +109,7 @@ class Engine
             if ($ipLimit > 0 && $ipRecent >= $ipLimit) {
                 return self::waiting('local_rate_limit', $trustLevel, [], $flags);
             }
-            if (Repository::duplicateCount($cid, $rawText, 30) > 0) {
+            if (Repository::duplicateCount($cid, $rawText, 7, $comment) > 0) {
                 return self::reject('local_duplicate', $trustLevel, [], $flags);
             }
         }
@@ -124,16 +133,37 @@ class Engine
         $aiComment['text'] = $text;
         $ai = DeepSeekClient::audit($aiComment, $article, $features, $settings, $historical);
 
+        // 身份分以 AI 为主，本地只做客观检查。最终分取较高值，避免 AI
+        // 没注意到的客观异常被直接放行。
+        if (!empty($settings['identityProtection'] ?? 1)) {
+            $aiIdentity = is_array($ai['identity'] ?? null) ? $ai['identity'] : null;
+            $ai['identity'] = IdentityRisk::merge($aiIdentity, IdentityRisk::evaluate($comment));
+        }
+
         // 4. 决策合并
         $result = self::merge($ai, $trustLevel, $comment, $settings, $flags, $historical);
         $identity = $ai['identity'] ?? null;
+
+        // 身份分达到高风险阈值时直接拒绝。只用于新评论，且 AI 自身失败时
+        // 不据此拒绝（避免审核服务故障造成误杀）。
+        if (!$historical && !empty($settings['identityProtection'] ?? 1)
+            && empty($ai['error']) && $result['decision'] !== 'rejected'
+            && is_array($identity) && ($identity['risk'] ?? 'low') === 'high'
+            && (int) ($identity['score'] ?? 0) >= IdentityRisk::HIGH_SCORE
+            && ($identity['category'] ?? 'none') !== 'none' && !empty($identity['evidence'])) {
+            return self::reject('identity_high_risk', $trustLevel, $ai, $flags);
+        }
+
+        // 中风险或 AI 身份疑点转待审，不直接拒绝。
         if (!empty($settings['identityProtection'] ?? 1) && $result['decision'] === 'approved'
             && is_array($identity) && in_array($identity['risk'], ['medium', 'high'], true)
-            && $identity['category'] !== 'none' && !empty($identity['evidence'])
-            && array_intersect($identity['sources'], [
-                'site_name_similarity', 'historical_name_similarity', 'history_profile_conflict', 'history_spam_pattern',
-            ])) {
-            return self::waiting('identity_review', $trustLevel, $ai, $flags);
+            && ($identity['category'] ?? 'none') !== 'none' && !empty($identity['evidence'])) {
+            $reason = IdentityRisk::rank((string) ($identity['local_risk'] ?? 'low'))
+                >= IdentityRisk::rank((string) ($identity['risk'] ?? 'low'))
+                ? 'identity_local_risk'
+                : 'identity_review';
+
+            return self::waiting($reason, $trustLevel, $ai, $flags);
         }
         return $result;
     }

@@ -176,14 +176,18 @@ class Repository
     }
 
     /**
-     * 同一文章下重复内容数量。
+     * 同一文章下、同一评论者的重复内容数量。
+     *
+     * 传入评论时只统计同一评论者：有邮箱按邮箱，没有邮箱时按昵称 + IP。
+     * 默认只回看 7 天，这样不同访客在同一篇文章下说出相同的话，不会被当成重复评论。
      *
      * @param int $cid
      * @param string $text
      * @param int $days
+     * @param array $comment
      * @return int
      */
-    public static function duplicateCount($cid, $text, $days = 30)
+    public static function duplicateCount($cid, $text, $days = 7, array $comment = [])
     {
         $cid = (int) $cid;
         $text = trim((string) $text);
@@ -192,13 +196,22 @@ class Repository
         }
 
         $db = self::db();
-        $row = $db->fetchRow(
-            $db->select(['COUNT(coid)' => 'num'])->from('table.comments')
-                ->where('cid = ?', $cid)
-                ->where('text = ?', $text)
-                ->where('created > ?', time() - max(1, (int) $days) * 86400)
-                ->where('status <> ?', 'spam')
-        );
+        $query = $db->select(['COUNT(coid)' => 'num'])->from('table.comments')
+            ->where('cid = ?', $cid)
+            ->where('text = ?', $text)
+            ->where('created > ?', time() - max(1, (int) $days) * 86400)
+            ->where('status <> ?', 'spam');
+
+        $mail = trim((string) ($comment['mail'] ?? ''));
+        $author = trim((string) ($comment['author'] ?? ''));
+        $ip = trim((string) ($comment['ip'] ?? ''));
+        if ($mail !== '') {
+            $query->where('mail = ?', $mail);
+        } elseif ($author !== '' || $ip !== '') {
+            $query->where('author = ?', $author)->where('ip = ?', $ip);
+        }
+
+        $row = $db->fetchRow($query);
 
         return (int) ($row['num'] ?? 0);
     }

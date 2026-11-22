@@ -137,7 +137,11 @@ class DeepSeekClient
 
         if ($identityEnabled && is_array($parsed['identity'] ?? null)) {
             $context = $features['identity_context'];
-            $allowed = ['site_name_similarity', 'placeholder_email', 'unverified_website'];
+            $allowed = [
+                'site_name_similarity', 'placeholder_email', 'public_mailbox', 'platform_homepage',
+                'search_engine_homepage', 'shortened_website', 'brand_impersonation',
+                'profile_mismatch', 'unverified_website',
+            ];
             if ($context['related_profiles']) {
                 $allowed[] = 'historical_name_similarity';
                 $allowed[] = 'history_profile_conflict';
@@ -146,11 +150,16 @@ class DeepSeekClient
                 }
             }
             $parsed['identity']['sources'] = array_values(array_intersect($allowed, $parsed['identity']['sources']));
-            if (!array_intersect($parsed['identity']['sources'], [
-                'site_name_similarity', 'historical_name_similarity', 'history_profile_conflict', 'history_spam_pattern',
-            ]) || !$parsed['identity']['evidence'] || $parsed['identity']['category'] === 'none'
-                || $context['current']['authenticated_site_owner']) {
-                $parsed['identity'] = ['risk' => 'low', 'category' => 'none', 'sources' => [], 'evidence' => []];
+            if ($context['current']['authenticated_site_owner']
+                || $parsed['identity']['category'] === 'none'
+                || empty($parsed['identity']['evidence'])) {
+                $parsed['identity'] = [
+                    'risk' => 'low',
+                    'score' => 0,
+                    'category' => 'none',
+                    'sources' => [],
+                    'evidence' => [],
+                ];
             }
         }
 
