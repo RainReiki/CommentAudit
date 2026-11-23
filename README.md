@@ -3,7 +3,7 @@
 > 作者：羽忆  
 > 作者站点：https://lizihao.com/  
 > 项目仓库：https://github.com/RainReiki/CommentAudit  
-> 当前版本：1.0.28<br>
+> 当前版本：1.0.29<br>
 > 发布日期：2026-11-23<br>
 > 适用环境：Typecho 1.3.x、PHP 8.0+、MySQL / MariaDB
 
@@ -253,7 +253,7 @@ API Key 每个字符显示为一个圆点。输入新 Key 后保存即可替换�
 
 ## 安装
 
-1. 下载并解压 [CommentAudit-1.0.28.zip](https://github.com/RainReiki/CommentAudit/releases/download/v1.0.28/CommentAudit-1.0.28.zip)；
+1. 下载并解压 [CommentAudit-1.0.29.zip](https://github.com/RainReiki/CommentAudit/releases/download/v1.0.29/CommentAudit-1.0.29.zip)；
 2. 解压后把 `CommentAudit` 目录放到：
 
 ```text
@@ -314,6 +314,19 @@ IP 黑名单应该来自你自己的垃圾评论日志，而不是从文章内�
 
 如果发现误伤，删除对应 TLD，改用具体域名或 URL 前缀。
 
+## 令牌额度怎么填
+
+后台「评论审核 → 设置 → API 额度」里的令牌额度是插件本地的熔断线，不是服务商账户余额。填 `0` 表示不限制。
+
+一次审核大约消耗 **3,000–6,000 tokens**（包含文章上下文、提示词和模型输出）。建议：
+
+- 额度 = 每月预计评论数 × 5,000 × 1.2
+- 额外留 **20% 缓冲**，因为最后一次调用可能略超剩余额度
+- 例：300 条/月 ≈ 1,800,000；1,000 条/月 ≈ 6,000,000
+- 测试可先填 `100,000`；小站可用 `1,000,000–5,000,000`
+
+周期可选每日 / 每月 / 累计。测试连接、历史扫描也会计入用量，命中缓存不计；如果中转站不返回 `usage.total_tokens`，额度不会累计。
+
 ---
 
 ## 隐私与安全
@@ -357,6 +370,13 @@ IP 黑名单应该来自你自己的垃圾评论日志，而不是从文章内�
 ---
 
 ## 更新记录
+
+### 1.0.29
+
+- **新增 API 令牌额度设置。** 后台「设置 → API 额度」可设置令牌额度和每日 / 每月 / 累计三种重置周期，0 表示不限制。
+- **额度保护。** 达到额度后新评论自动转待审，不再调用 AI 接口；测试连接仍可手动执行。
+- **用量显示。** 设置页显示当前周期已用、剩余、百分比和进度条，并附简单的填写建议。
+- **统计范围。** 按服务商返回的 `usage.total_tokens` 统计评论审核、历史扫描和测试连接。
 
 ### 1.0.28
 
@@ -498,7 +518,7 @@ https://github.com/RainReiki/CommentAudit/releases/latest
 插件包：
 
 ```text
-CommentAudit-1.0.28.zip
+CommentAudit-1.0.29.zip
 ```
 
 安装包内顶层目录为 `CommentAudit`，直接覆盖 `usr/plugins/CommentAudit` 即可。

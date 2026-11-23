@@ -309,3 +309,71 @@ html:has(#darkcss:not([disabled])) :is(.commentaudit-scope, .commentaudit-enhanc
     .commentaudit-trust-form { flex-wrap: wrap; }
     .commentaudit-trust-form select { flex: 1 1 120px; max-width: 100%; }
 }
+
+/* API 额度 */
+.commentaudit-quota-help {
+    margin: 12px 0 4px;
+    padding: 12px 14px;
+    border: 1px solid var(--ca-border);
+    border-radius: 10px;
+    background: var(--ca-soft-bg);
+}
+
+.commentaudit-quota-help strong {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--ca-text);
+    font-size: 13px;
+}
+
+.commentaudit-quota-help p,
+.commentaudit-quota-note {
+    margin: 4px 0 0;
+    color: var(--ca-muted);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.commentaudit-quota-usage {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+    margin: 12px 0 6px;
+}
+
+.commentaudit-quota-usage strong {
+    color: var(--ca-text);
+    font-size: 18px;
+}
+
+.commentaudit-quota-usage span {
+    color: var(--ca-muted);
+    font-size: 12px;
+}
+
+.commentaudit-quota-usage.is-reached strong {
+    color: var(--ca-error);
+}
+
+.commentaudit-quota-meter {
+    width: 100%;
+    max-width: 640px;
+    height: 9px;
+    margin: 6px 0 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--ca-border);
+}
+
+.commentaudit-quota-meter span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--ca-accent);
+    transition: width .2s ease;
+}
+
+.commentaudit-quota-meter.is-reached span {
+    background: var(--ca-error);
+}

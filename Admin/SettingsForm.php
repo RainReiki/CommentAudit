@@ -14,6 +14,7 @@ use Typecho\Widget\Helper\Form\Element\Text;
 use Typecho\Widget\Helper\Form\Element\Textarea;
 use Typecho\Widget\Helper\Layout;
 use TypechoPlugin\CommentAudit\Plugin;
+use TypechoPlugin\CommentAudit\Repository;
 use Utils\Helper;
 use Widget\Options;
 
@@ -26,6 +27,7 @@ final class SettingsForm
     private const RANGES = [
         'deepseekTimeout' => [1, null],
         'deepseekMaxTokens' => [1, null],
+        'tokenQuota' => [0, null],
         'ipRateLimit' => [0, null],
         'ipRateWindow' => [60, null],
         'linkLimit' => [0, null],
@@ -55,6 +57,14 @@ final class SettingsForm
                 'deepseekMaxTokens' => [Number::class, _t('最大 token 数'), _t('默认 1200。中转站较慢时可尝试 800。')],
                 'deepseekSslVerify' => [Radio::class, _t('验证 SSL 证书'), _t('生产环境建议开启。'), $enabled],
                 'deepseekDebug' => [Radio::class, _t('DeepSeek 调试日志'), _t('仅在排查连接问题时开启。'), $enabled],
+            ]],
+            'quota' => [_t('API 额度'), _t('限制插件调用 AI 时最多消耗多少令牌。额度用完后新评论转待审，不再请求接口。'), [
+                'tokenQuota' => [Number::class, _t('令牌额度'), _t('填 0 表示不限制。按服务商返回的 usage.total_tokens 统计，建议额度 = 每月评论数 × 5,000 × 1.2，并留 20% 缓冲。')],
+                'quotaPeriod' => [Radio::class, _t('重置周期'), _t('每日 / 每月自动重置；累计不自动重置。'), [
+                    'daily' => _t('每日'),
+                    'monthly' => _t('每月'),
+                    'total' => _t('累计'),
+                ]],
             ]],
             'words' => [_t('词表与匹配范围'), _t('明确违禁词直接拒绝，疑似词交给 AI 判断。'), [
                 'blockWords' => [Textarea::class, _t('明确违禁词'), _t('每行一个词。')],
@@ -112,6 +122,9 @@ final class SettingsForm
                 $visible[$name] = true;
             }
             $section->addItem($grid);
+            if ($id === 'quota') {
+                $section->addItem(self::html(self::quotaSummary($settings)));
+            }
             $form->addItem($section);
         }
 
@@ -173,6 +186,11 @@ final class SettingsForm
             $settings['wordScopes'] = array_values(array_intersect(self::SCOPES, $scopes));
         }
 
+        $quotaPeriod = $submitted['quotaPeriod'] ?? null;
+        if (in_array($quotaPeriod, ['daily', 'monthly', 'total'], true)) {
+            $settings['quotaPeriod'] = $quotaPeriod;
+        }
+
         foreach (self::RANGES as $name => $range) {
             [$min, $max] = $range;
             $value = $submitted[$name] ?? null;
@@ -181,6 +199,53 @@ final class SettingsForm
             }
         }
         return $settings;
+    }
+
+    /**
+     * 额度填写建议与当前周期用量。
+     *
+     * @param array $settings
+     * @return string
+     */
+    private static function quotaSummary(array $settings): string
+    {
+        $quota = max(0, (int) ($settings['tokenQuota'] ?? 0));
+        try {
+            $usage = Repository::getTokenUsage((string) ($settings['quotaPeriod'] ?? 'monthly'));
+        } catch (\Throwable $e) {
+            $usage = ['tokens' => 0];
+        }
+        $used = max(0, (int) ($usage['tokens'] ?? 0));
+        $percent = $quota > 0 ? min(100, (int) round($used / max(1, $quota) * 100)) : 0;
+        $remaining = $quota > 0 ? max(0, $quota - $used) : null;
+        $reached = $quota > 0 && $used >= $quota;
+
+        $html = '<div class="commentaudit-quota-help">'
+            . '<strong>' . self::escape(_t('怎么填？')) . '</strong>'
+            . '<p>' . self::escape(_t('一次审核约 3,000–6,000 tokens。建议额度 = 每月评论数 × 5,000 × 1.2，并额外留 20% 缓冲。')) . '</p>'
+            . '<p>' . self::escape(_t('例：300 条/月 ≈ 1,800,000；1,000 条/月 ≈ 6,000,000。测试可先填 100,000；0 表示不限制。')) . '</p>'
+            . '</div>';
+
+        $summary = '<div class="commentaudit-quota-usage' . ($reached ? ' is-reached' : '') . '">'
+            . '<strong>' . self::escape(number_format($used)) . ' tokens</strong>';
+        if ($quota > 0) {
+            $summary .= '<span>/ ' . self::escape(number_format($quota)) . '（' . $percent . '%）· '
+                . self::escape(_t('剩余')) . ' ' . self::escape(number_format((int) $remaining)) . '</span>';
+        } else {
+            $summary .= '<span>' . self::escape(_t('未设置上限')) . '</span>';
+        }
+        $summary .= '</div>';
+
+        if ($quota > 0) {
+            $summary .= '<div class="commentaudit-quota-meter' . ($reached ? ' is-reached' : '') . '">'
+                . '<span style="width:' . (int) $percent . '%"></span></div>';
+        }
+
+        if ($reached) {
+            $summary .= '<p class="commentaudit-quota-note">' . self::escape(_t('额度已用完，新评论会转待审。可以调高额度。')) . '</p>';
+        }
+
+        return $html . $summary;
     }
 
     private static function input(string $name, $value, array $field): Element

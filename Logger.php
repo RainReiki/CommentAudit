@@ -150,6 +150,7 @@ class Logger
             'ai_review' => 'AI 转待审',
             'ai_error' => 'AI 审核失败',
             'ai_missing_key' => '未配置 DeepSeek API Key',
+            'quota_exceeded' => 'API 令牌额度已用完',
             'ai_circuit_open' => 'AI 熔断中',
             'ai_unknown' => 'AI 结果无法判断',
             'abuse_mild' => '轻度负面评论',

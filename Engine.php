@@ -191,7 +191,7 @@ class Engine
 
         if ($ai['error'] ?? false) {
             $errorReason = (string) ($ai['reason'] ?? 'ai_error');
-            if (!in_array($errorReason, ['ai_error', 'ai_missing_key', 'ai_circuit_open'], true)) {
+            if (!in_array($errorReason, ['ai_error', 'ai_missing_key', 'ai_circuit_open', 'quota_exceeded'], true)) {
                 $errorReason = 'ai_error';
             }
             return self::waiting($errorReason, $trustLevel, $ai, $flags);

@@ -244,7 +244,7 @@ class Action extends Base implements ActionInterface
         ];
 
         try {
-            $result = DeepSeekClient::audit($comment, $article, $features, Plugin::settings(), true);
+            $result = DeepSeekClient::audit($comment, $article, $features, Plugin::settings(), true, true);
             $this->response->throwJson([
                 'success' => empty($result['error']),
                 'result' => $result,

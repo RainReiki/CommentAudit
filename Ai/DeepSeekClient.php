@@ -15,7 +15,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  */
 class DeepSeekClient
 {
-    private const USER_AGENT = 'CommentAudit/1.0.28 (+https://lizihao.com/)';
+    private const USER_AGENT = 'CommentAudit/1.0.29 (+https://lizihao.com/)';
 
     /**
      * 审核一条评论。
@@ -24,9 +24,11 @@ class DeepSeekClient
      * @param array $article
      * @param array $features
      * @param array $settings
+     * @param bool $preview
+     * @param bool $ignoreQuota 测试连接可在额度用尽时继续执行。
      * @return array
      */
-    public static function audit(array $comment, array $article, array $features, array $settings, bool $preview = false)
+    public static function audit(array $comment, array $article, array $features, array $settings, bool $preview = false, bool $ignoreQuota = false)
     {
         $model = trim((string) ($settings['deepseekModel'] ?? 'deepseek-flash'));
         if ($model === '') {
@@ -63,6 +65,23 @@ class DeepSeekClient
         $circuit = Repository::getState('ai_circuit');
         if (!empty($circuit['open_until']) && (int) $circuit['open_until'] > time()) {
             return self::failure('ai_circuit_open');
+        }
+
+        $tokenQuota = max(0, (int) ($settings['tokenQuota'] ?? 0));
+        $quotaPeriod = (string) ($settings['quotaPeriod'] ?? 'monthly');
+        if (!$ignoreQuota && $tokenQuota > 0) {
+            try {
+                $usage = Repository::getTokenUsage($quotaPeriod);
+            } catch (\Throwable $e) {
+                $usage = ['tokens' => 0];
+            }
+            if ((int) ($usage['tokens'] ?? 0) >= $tokenQuota) {
+                return self::failure('quota_exceeded', 0, sprintf(
+                    _t('AI 令牌额度已用完（%1$s / %2$s tokens）。请调高额度。'),
+                    number_format((int) ($usage['tokens'] ?? 0)),
+                    number_format($tokenQuota)
+                ));
+            }
         }
 
         $messages = PromptBuilder::build($comment, $article, $features);
@@ -179,6 +198,14 @@ class DeepSeekClient
         $parsed['tokens'] = (int) ($data['usage']['total_tokens'] ?? 0);
         $parsed['cached'] = false;
         $parsed['conversation'] = $features['conversation_context'];
+
+        if ($parsed['tokens'] > 0) {
+            try {
+                Repository::addTokenUsage((int) $parsed['tokens'], $quotaPeriod);
+            } catch (\Throwable $e) {
+                // 用量统计失败不能影响审核。
+            }
+        }
 
         if ($preview) {
             return $parsed;

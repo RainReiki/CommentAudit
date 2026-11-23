@@ -533,6 +533,69 @@ class Repository
     }
 
     /**
+     * 令牌额度所属周期。
+     *
+     * @param string $period daily|monthly|total
+     * @return string
+     */
+    public static function quotaPeriodKey($period)
+    {
+        if ($period === 'daily') {
+            return date('Y-m-d');
+        }
+        if ($period === 'total') {
+            return 'all';
+        }
+        return date('Y-m');
+    }
+
+    /**
+     * 获取当前周期已用 tokens。
+     *
+     * @param string $period
+     * @return array
+     */
+    public static function getTokenUsage($period = 'monthly')
+    {
+        $key = self::quotaPeriodKey((string) $period);
+        $state = self::getState('token_usage');
+        if (!is_array($state) || ($state['period'] ?? '') !== $key) {
+            return ['period' => $key, 'tokens' => 0];
+        }
+
+        return ['period' => $key, 'tokens' => max(0, (int) ($state['tokens'] ?? 0))];
+    }
+
+    /**
+     * 累加 tokens 用量。
+     *
+     * @param int $tokens
+     * @param string $period
+     * @return array
+     */
+    public static function addTokenUsage($tokens, $period = 'monthly')
+    {
+        $usage = self::getTokenUsage((string) $period);
+        $usage['tokens'] += max(0, (int) $tokens);
+        self::setState('token_usage', $usage);
+        return $usage;
+    }
+
+    /**
+     * 重置已用 tokens。
+     *
+     * @param string $period
+     * @return void
+     */
+    public static function resetTokenUsage($period = 'monthly')
+    {
+        self::setState('token_usage', [
+            'period' => self::quotaPeriodKey((string) $period),
+            'tokens' => 0,
+        ]);
+    }
+
+    /**
      * 日志查询。
      *
      * @param int $limit
