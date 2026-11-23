@@ -3,7 +3,7 @@
 > 作者：羽忆  
 > 作者站点：https://lizihao.com/  
 > 项目仓库：https://github.com/RainReiki/CommentAudit  
-> 当前版本：1.0.25<br>
+> 当前版本：1.0.26<br>
 > 发布日期：2026-11-23<br>
 > 适用环境：Typecho 1.3.x、PHP 8.0+、MySQL / MariaDB
 
@@ -60,7 +60,7 @@ AI 会结合：
 评论内容
 评论者昵称
 文章标题
-文章原文（最多 3000 字）
+文章原文（一级最多 2000 字，回复最多 800 字）
 文章摘要
 文章分类
 文章标签
@@ -188,7 +188,7 @@ AI review / block / 命中本地规则 → 待审或拒绝
 
 使用底部导航切换下列分组。页面一次显示一组，切换时保留已输入的内容，点击「保存设置」统一提交。
 
-- **DeepSeek 连接**配置 API Key、模型、服务地址、超时、最大 token、SSL 验证和调试日志。
+- **DeepSeek 连接**配置 API Key、模型、服务地址、超时、最大 token、思考模式、SSL 验证和调试日志。
 - **词表与匹配范围**管理明确违禁词、疑似敏感词和检查字段。
 - **黑名单**管理 IP、邮箱和网址规则。
 - **频率与链接**配置同一 IP 的评论频率与链接数量限制。
@@ -253,7 +253,7 @@ API Key 每个字符显示为一个圆点。输入新 Key 后保存即可替换�
 
 ## 安装
 
-1. 下载并解压 [CommentAudit-1.0.25.zip](https://github.com/RainReiki/CommentAudit/releases/download/v1.0.25/CommentAudit-1.0.25.zip)；
+1. 下载并解压 [CommentAudit-1.0.26.zip](https://github.com/RainReiki/CommentAudit/releases/download/v1.0.26/CommentAudit-1.0.26.zip)；
 2. 解压后把 `CommentAudit` 目录放到：
 
 ```text
@@ -347,7 +347,7 @@ IP 黑名单应该来自你自己的垃圾评论日志，而不是从文章内�
 ## 已知限制
 
 - AI 置信度是模型自评，不是严格校准的概率；
-- 文章原文最多传入 3000 字，超长文章只取前 3000 字；
+- 一级评论最多传入 2000 字文章原文，回复最多传入 800 字；超长部分会被截断；
 - AI 调用是同步的，平均耗时约 2 秒；
 - 高并发场景尚未做专门压测；
 - AI 对边界文本的判断可能存在波动，建议上线后先观察日志；
@@ -357,6 +357,12 @@ IP 黑名单应该来自你自己的垃圾评论日志，而不是从文章内�
 ---
 
 ## 更新记录
+
+### 1.0.26
+
+- **减少单次审核耗时。** 一级评论文章原文从 3000 字降到 2000 字，回复从 3000 字降到 800 字；上级对话正文和身份历史样本也做了更紧的截断，减少输入 token。
+- **新增「思考模式」开关。** 中转站较慢、且支持 DeepSeek `thinking` 参数时，可在设置里选择「关闭思考」，通常能明显减少等待；如果中转站提示不支持该参数，改回「保持默认」即可。
+- **建议同时调整最大 token。** 中转站较慢时可以把「最大 token 数」从 1200 降到 800；审核结果本身很短，一般够用。
 
 ### 1.0.25
 
@@ -483,7 +489,7 @@ https://github.com/RainReiki/CommentAudit/releases/latest
 插件包：
 
 ```text
-CommentAudit-1.0.25.zip
+CommentAudit-1.0.26.zip
 ```
 
 安装包内顶层目录为 `CommentAudit`，直接覆盖 `usr/plugins/CommentAudit` 即可。

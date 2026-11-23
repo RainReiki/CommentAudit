@@ -27,12 +27,12 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  *
  * @package CommentAudit
  * @author 羽忆
- * @version 1.0.25
+ * @version 1.0.26
  * @link https://lizihao.com/
  */
 class Plugin implements PluginInterface
 {
-    public const VERSION = '1.0.25';
+    public const VERSION = '1.0.26';
     public const PLUGIN_NAME = 'CommentAudit';
 
     /**
@@ -342,6 +342,7 @@ class Plugin implements PluginInterface
             'deepseekTimeout' => 8,
             'deepseekMaxTokens' => 1200,
             'deepseekSslVerify' => 1,
+            'deepseekDisableThinking' => 0,
             'deepseekDebug' => 0,
             'identityProtection' => 1,
             'thresholdNew' => 0.7,

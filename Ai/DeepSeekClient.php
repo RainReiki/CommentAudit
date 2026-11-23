@@ -15,7 +15,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  */
 class DeepSeekClient
 {
-    private const USER_AGENT = 'CommentAudit/1.0.25 (+https://lizihao.com/)';
+    private const USER_AGENT = 'CommentAudit/1.0.26 (+https://lizihao.com/)';
 
     /**
      * 审核一条评论。
@@ -69,20 +69,8 @@ class DeepSeekClient
         $baseUrl = self::normalizeBaseUrl((string) ($settings['deepseekBaseUrl'] ?? 'https://api.deepseek.com'));
 
         $timeout = max(3, (int) ($settings['deepseekTimeout'] ?? 8));
-        $maxTokens = max(300, (int) ($settings['deepseekMaxTokens'] ?? 1200));
         $sslVerify = !empty($settings['deepseekSslVerify']);
-        $body = [
-            'model' => $model,
-            'messages' => $messages,
-            'temperature' => 0,
-            'max_tokens' => $maxTokens,
-            'stream' => false,
-        ];
-        $host = strtolower((string) parse_url($baseUrl, PHP_URL_HOST));
-        if ($host === 'api.deepseek.com'
-            && in_array($model, ['deepseek-flash', 'deepseek-v4-flash', 'deepseek-v4-pro'], true)) {
-            $body['thinking'] = ['type' => 'disabled'];
-        }
+        $body = self::buildBody($model, $messages, $settings, $baseUrl);
 
         $start = microtime(true);
         $response = ['body' => '', 'error' => 'http_error', 'status' => 0];
@@ -328,6 +316,36 @@ class DeepSeekClient
         sort($models, SORT_NATURAL | SORT_FLAG_CASE);
 
         return $models;
+    }
+
+    /**
+     * 构建请求体。中转站开启“关闭思考”时统一带上 thinking 参数。
+     *
+     * @param string $model
+     * @param array $messages
+     * @param array $settings
+     * @param string $baseUrl
+     * @return array
+     */
+    private static function buildBody(string $model, array $messages, array $settings, string $baseUrl): array
+    {
+        $body = [
+            'model' => $model,
+            'messages' => $messages,
+            'temperature' => 0,
+            'max_tokens' => max(300, (int) ($settings['deepseekMaxTokens'] ?? 1200)),
+            'stream' => false,
+        ];
+
+        $host = strtolower((string) parse_url($baseUrl, PHP_URL_HOST));
+        if (!empty($settings['deepseekDisableThinking'])) {
+            $body['thinking'] = ['type' => 'disabled'];
+        } elseif ($host === 'api.deepseek.com'
+            && in_array($model, ['deepseek-flash', 'deepseek-v4-flash', 'deepseek-v4-pro'], true)) {
+            $body['thinking'] = ['type' => 'disabled'];
+        }
+
+        return $body;
     }
 
     /**

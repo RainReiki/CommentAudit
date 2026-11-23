@@ -72,7 +72,7 @@ final class IdentityContext
             $profileAuthor = Common::subStr((string) $row['author'], 0, 60, '');
             $key = json_encode([$profileAuthor, $profileHost, $relation]);
             if (!isset($profiles[$key])) {
-                if (count($profiles) >= 8) {
+                if (count($profiles) >= 6) {
                     continue;
                 }
                 $profiles[$key] = [

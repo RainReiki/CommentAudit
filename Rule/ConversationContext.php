@@ -46,7 +46,7 @@ final class ConversationContext
                 break;
             }
             $text = trim(strip_tags((string) ($row['text'] ?? '')));
-            $limit = $context['ancestors'] ? 320 : 800;
+            $limit = $context['ancestors'] ? 240 : 600;
             // Oldest-first order is applied below; direct parent keeps the largest text budget.
             $context['ancestors'][] = [
                 'id' => (int) $row['coid'],

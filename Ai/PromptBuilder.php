@@ -47,7 +47,7 @@ JSON 字段：
 
 上下文说明：
 - article.title 是文章标题；
-- article.content 是文章原文，最多 3000 字；
+- article.content 是文章原文，一级评论最多 2000 字，回复最多 800 字；
 - article.excerpt 是文章摘要；
 - comment.text 是待审核评论。
 - features.conversation_context 表示评论层级。is_reply=false 为一级评论；is_reply=true 为回复。ancestors 按从上级到直接父评论排列，最后一条是正在回复的对象。文章内容只是回复的背景。
@@ -76,7 +76,7 @@ JSON 字段：
 - reason 简短说明是根据文章还是回复对话判断，不复述他人的违规内容。
 
 身份检查是独立任务，不要把身份疑点混入正文 decision、category、reason：
-- features.identity_context 包含站点身份、当前昵称、邮箱前缀与域名、网址域名与是否首页、最多八组相关历史组合。没有该字段时 identity 必须为 low / 0 / none，sources、evidence 均为空。
+- features.identity_context 包含站点身份、当前昵称、邮箱前缀与域名、网址域名与是否首页、最多六组相关历史组合。没有该字段时 identity 必须为 low / 0 / none，sources、evidence 均为空。
 - 请结合你对常见品牌、平台、银行、电商、搜索引擎、短链接、公共邮箱和占位邮箱的了解，判断这组昵称、邮箱、网址是否像灌水、机器填写或冒用。这里只评估“组合是否合理”，不要断言域名归属或真实身份。
 - identity.score 是 0-10 的整数：0-2 正常或只有单项弱信号；3-5 需要人工复核；6-8 高度可疑，建议直接拒绝；9-10 明确机器填写或冒用。risk 必须与 score 一致：0-2 为 low，3-5 为 medium，6-10 为 high。
 - 典型组合：
@@ -96,14 +96,16 @@ PROMPT;
         $excerpt = (string) ($article['excerpt'] ?? '');
         $articleText = (string) ($article['content'] ?? '');
         $commentText = (string) ($comment['text'] ?? '');
+        // 回复优先参考父评论和对话，不需要整篇文章；减少输入 token 可以明显降低耗时。
+        $articleLimit = !empty($features['conversation_context']['is_reply']) ? 800 : 2000;
 
         if (function_exists('mb_substr')) {
             $excerpt = mb_substr($excerpt, 0, 200, 'UTF-8');
-            $articleText = mb_substr($articleText, 0, 3000, 'UTF-8');
+            $articleText = mb_substr($articleText, 0, $articleLimit, 'UTF-8');
             $commentText = mb_substr($commentText, 0, 2000, 'UTF-8');
         } else {
             $excerpt = substr($excerpt, 0, 200);
-            $articleText = substr($articleText, 0, 3000);
+            $articleText = substr($articleText, 0, $articleLimit);
             $commentText = substr($commentText, 0, 2000);
         }
 
