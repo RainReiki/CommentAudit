@@ -3,8 +3,8 @@
 > 作者：羽忆  
 > 作者站点：https://lizihao.com/  
 > 项目仓库：https://github.com/RainReiki/CommentAudit  
-> 当前版本：1.0.23<br>
-> 发布日期：2026-11-22<br>
+> 当前版本：1.0.24<br>
+> 发布日期：2026-11-23<br>
 > 适用环境：Typecho 1.3.x、PHP 8.0+、MySQL / MariaDB
 
 ---
@@ -124,7 +124,8 @@ AI 失败、超时、没有配置 Key 时：
 
 ### AI 审核
 
-- DeepSeek `deepseek-flash`，可切换其他模型
+- OpenAI 兼容接口，支持 DeepSeek 官方和第三方中转站
+- 默认 `deepseek-flash`，可切换其他模型
 - 结合文章标题、原文、摘要、分类、标签
 - 输出 pass / review / block
 - 输出类别、严重度、主题相关、忠实度、置信度
@@ -252,7 +253,7 @@ API Key 每个字符显示为一个圆点。输入新 Key 后保存即可替换�
 
 ## 安装
 
-1. 下载并解压 [CommentAudit-1.0.23.zip](https://github.com/RainReiki/CommentAudit/releases/download/v1.0.23/CommentAudit-1.0.23.zip)；
+1. 下载并解压 [CommentAudit-1.0.24.zip](https://github.com/RainReiki/CommentAudit/releases/download/v1.0.24/CommentAudit-1.0.24.zip)；
 2. 解压后把 `CommentAudit` 目录放到：
 
 ```text
@@ -356,6 +357,12 @@ IP 黑名单应该来自你自己的垃圾评论日志，而不是从文章内�
 ---
 
 ## 更新记录
+
+### 1.0.24
+
+- **支持第三方中转站。** 服务地址可填根地址、`.../v1` 或完整的 `.../v1/chat/completions`；根地址会依次尝试 `/v1/chat/completions` 和 `/chat/completions`，不再要求必须是 DeepSeek 官方地址。
+- **兼容更多返回格式。** 支持中转站返回 SSE 流式数据、`content` 数组、`choices[0].text` 等格式，并自动跳过 BOM 或 JSON 前后的多余内容。
+- **错误提示更具体。** 非 JSON 响应会显示 HTTP 状态、实际请求地址和返回片段，并提示检查 `/v1` 路径或中转站拦截，不再只提示“服务没有返回有效的 JSON”。
 
 ### 1.0.23
 
@@ -471,7 +478,7 @@ https://github.com/RainReiki/CommentAudit/releases/latest
 插件包：
 
 ```text
-CommentAudit-1.0.23.zip
+CommentAudit-1.0.24.zip
 ```
 
 安装包内顶层目录为 `CommentAudit`，直接覆盖 `usr/plugins/CommentAudit` 即可。

@@ -47,7 +47,7 @@ final class SettingsForm
                     ? _t('尚未配置。填写并保存后即可测试连接。')
                     : _t('已配置。可替换为新 Key，或清空后保存。')],
                 'deepseekModel' => [Text::class, _t('模型'), _t('默认 deepseek-flash。')],
-                'deepseekBaseUrl' => [Text::class, _t('服务地址'), _t('默认 https://api.deepseek.com。')],
+                'deepseekBaseUrl' => [Text::class, _t('服务地址'), _t('默认 https://api.deepseek.com。可填根地址、.../v1 或完整 .../v1/chat/completions，插件会自动尝试补全 /v1。')],
                 'deepseekTimeout' => [Number::class, _t('请求超时（秒）'), _t('默认 8 秒。')],
                 'deepseekMaxTokens' => [Number::class, _t('最大 token 数'), _t('默认 1200。')],
                 'deepseekSslVerify' => [Radio::class, _t('验证 SSL 证书'), _t('生产环境建议开启。'), $enabled],
