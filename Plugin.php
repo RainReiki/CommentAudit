@@ -27,12 +27,12 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  *
  * @package CommentAudit
  * @author 羽忆
- * @version 1.0.26
+ * @version 1.0.27
  * @link https://lizihao.com/
  */
 class Plugin implements PluginInterface
 {
-    public const VERSION = '1.0.26';
+    public const VERSION = '1.0.27';
     public const PLUGIN_NAME = 'CommentAudit';
 
     /**

@@ -91,17 +91,21 @@
     status.setAttribute('role', 'status');
     status.textContent = '保存设置后可获取列表';
 
-    var list = document.createElement('datalist');
-    list.id = 'commentaudit-model-list';
-    input.setAttribute('list', list.id);
+    var select = document.createElement('select');
+    select.className = 'text';
+    select.style.maxWidth = '320px';
+    select.style.display = 'none';
+    select.setAttribute('aria-label', '模型列表');
 
     tools.appendChild(button);
+    tools.appendChild(select);
     tools.appendChild(status);
-    tools.appendChild(list);
     input.parentNode.insertBefore(tools, input.nextSibling);
 
     button.addEventListener('click', function () {
         button.disabled = true;
+        select.style.display = 'none';
+        select.innerHTML = '';
         status.textContent = '获取中…';
         fetch(url, { method: 'POST', credentials: 'same-origin' })
             .then(function (response) { return response.json(); })
@@ -111,15 +115,38 @@
                     return;
                 }
                 var models = data.models || [];
-                list.innerHTML = '';
+                if (!models.length) {
+                    status.textContent = '没有找到模型';
+                    return;
+                }
+
+                var current = input.value.trim();
+                var placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = '选择模型…';
+                select.appendChild(placeholder);
+
+                var foundCurrent = false;
                 models.forEach(function (id) {
                     var option = document.createElement('option');
                     option.value = id;
-                    list.appendChild(option);
+                    option.textContent = id;
+                    select.appendChild(option);
+                    if (id === current) {
+                        foundCurrent = true;
+                    }
                 });
-                status.textContent = models.length
-                    ? '找到 ' + models.length + ' 个模型，点击输入框选择'
-                    : '没有找到模型';
+
+                if (current && !foundCurrent) {
+                    var currentOption = document.createElement('option');
+                    currentOption.value = current;
+                    currentOption.textContent = current + '（当前）';
+                    select.appendChild(currentOption);
+                }
+
+                select.value = current || '';
+                select.style.display = '';
+                status.textContent = '找到 ' + models.length + ' 个模型，请选择';
             })
             .catch(function () {
                 status.textContent = '请求失败，请检查网络或登录状态';
@@ -127,5 +154,11 @@
             .finally(function () {
                 button.disabled = false;
             });
+    });
+
+    select.addEventListener('change', function () {
+        if (!select.value) return;
+        input.value = select.value;
+        status.textContent = '已选择 ' + select.value;
     });
 })();

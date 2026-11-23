@@ -45,12 +45,12 @@ final class SettingsForm
         $thinkingOptions = ['0' => _t('保持默认'), '1' => _t('关闭思考')];
         $groups = [
             'connection' => [_t('DeepSeek 连接'), _t('配置审核服务的地址、模型与访问凭据。'), [
+                'deepseekBaseUrl' => [Text::class, _t('服务地址'), _t('默认 https://api.deepseek.com。可填根地址、.../v1 或完整 .../v1/chat/completions，插件会自动尝试补全 /v1。')],
                 'deepseekApiKey' => [Password::class, _t('API Key'), !$hasApiKey
                     ? _t('尚未配置。填写并保存后即可测试连接。')
                     : _t('已配置。可替换为新 Key，或清空后保存。')],
                 'deepseekModel' => [Text::class, _t('模型'), _t('默认 deepseek-flash。不同服务商模型名不同，保存后可点击「获取模型列表」选择。')],
                 'deepseekDisableThinking' => [Radio::class, _t('思考模式'), _t('中转站较慢时可选择「关闭思考」，通常能减少等待；若提示不支持该参数，请改回默认。'), $thinkingOptions],
-                'deepseekBaseUrl' => [Text::class, _t('服务地址'), _t('默认 https://api.deepseek.com。可填根地址、.../v1 或完整 .../v1/chat/completions，插件会自动尝试补全 /v1。')],
                 'deepseekTimeout' => [Number::class, _t('请求超时（秒）'), _t('默认 8 秒。')],
                 'deepseekMaxTokens' => [Number::class, _t('最大 token 数'), _t('默认 1200。中转站较慢时可尝试 800。')],
                 'deepseekSslVerify' => [Radio::class, _t('验证 SSL 证书'), _t('生产环境建议开启。'), $enabled],

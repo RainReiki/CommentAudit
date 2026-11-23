@@ -3,7 +3,7 @@
 > 作者：羽忆  
 > 作者站点：https://lizihao.com/  
 > 项目仓库：https://github.com/RainReiki/CommentAudit  
-> 当前版本：1.0.26<br>
+> 当前版本：1.0.27<br>
 > 发布日期：2026-11-23<br>
 > 适用环境：Typecho 1.3.x、PHP 8.0+、MySQL / MariaDB
 
@@ -253,7 +253,7 @@ API Key 每个字符显示为一个圆点。输入新 Key 后保存即可替换�
 
 ## 安装
 
-1. 下载并解压 [CommentAudit-1.0.26.zip](https://github.com/RainReiki/CommentAudit/releases/download/v1.0.26/CommentAudit-1.0.26.zip)；
+1. 下载并解压 [CommentAudit-1.0.27.zip](https://github.com/RainReiki/CommentAudit/releases/download/v1.0.27/CommentAudit-1.0.27.zip)；
 2. 解压后把 `CommentAudit` 目录放到：
 
 ```text
@@ -357,6 +357,11 @@ IP 黑名单应该来自你自己的垃圾评论日志，而不是从文章内�
 ---
 
 ## 更新记录
+
+### 1.0.27
+
+- **连接设置顺序调整。** 依次为服务地址、API Key、模型、思考模式、请求超时、最大 token、SSL 验证、调试日志，先填地址和密钥再选模型。
+- **模型列表改为下拉选择。** 获取后直接出现下拉框，选择即填入模型字段，不再依赖浏览器对 `datalist` 的支持；当前模型不在列表里时会保留为「当前」选项。
 
 ### 1.0.26
 
@@ -489,7 +494,7 @@ https://github.com/RainReiki/CommentAudit/releases/latest
 插件包：
 
 ```text
-CommentAudit-1.0.26.zip
+CommentAudit-1.0.27.zip
 ```
 
 安装包内顶层目录为 `CommentAudit`，直接覆盖 `usr/plugins/CommentAudit` 即可。
