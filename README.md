@@ -3,7 +3,7 @@
 > 作者：羽忆  
 > 作者站点：https://lizihao.com/  
 > 项目仓库：https://github.com/RainReiki/CommentAudit  
-> 当前版本：1.0.27<br>
+> 当前版本：1.0.28<br>
 > 发布日期：2026-11-23<br>
 > 适用环境：Typecho 1.3.x、PHP 8.0+、MySQL / MariaDB
 
@@ -253,7 +253,7 @@ API Key 每个字符显示为一个圆点。输入新 Key 后保存即可替换�
 
 ## 安装
 
-1. 下载并解压 [CommentAudit-1.0.27.zip](https://github.com/RainReiki/CommentAudit/releases/download/v1.0.27/CommentAudit-1.0.27.zip)；
+1. 下载并解压 [CommentAudit-1.0.28.zip](https://github.com/RainReiki/CommentAudit/releases/download/v1.0.28/CommentAudit-1.0.28.zip)；
 2. 解压后把 `CommentAudit` 目录放到：
 
 ```text
@@ -357,6 +357,10 @@ IP 黑名单应该来自你自己的垃圾评论日志，而不是从文章内�
 ---
 
 ## 更新记录
+
+### 1.0.28
+
+- **测试连接显示耗时。** 运行状态里的「测试连接」会在“连接正常”或失败原因后追加本次请求耗时，例如「连接正常 · 1845ms」，方便对比官方服务和第三方中转站。
 
 ### 1.0.27
 
@@ -494,7 +498,7 @@ https://github.com/RainReiki/CommentAudit/releases/latest
 插件包：
 
 ```text
-CommentAudit-1.0.27.zip
+CommentAudit-1.0.28.zip
 ```
 
 安装包内顶层目录为 `CommentAudit`，直接覆盖 `usr/plugins/CommentAudit` 即可。

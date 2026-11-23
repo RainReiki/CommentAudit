@@ -172,9 +172,16 @@ require $adminPath . '/menu.php';
                     fetch(url, {method: 'POST', credentials: 'same-origin'})
                         .then(function (response) { return response.json(); })
                         .then(function (data) {
-                            result.textContent = data && data.success
+                            var latency = data && data.result && Number(data.result.latency_ms) > 0
+                                ? Number(data.result.latency_ms)
+                                : 0;
+                            var text = data && data.success
                                 ? <?php echo json_encode(_t('连接正常'), JSON_HEX_TAG); ?>
                                 : (data && data.message) || <?php echo json_encode(_t('连接失败，请检查设置'), JSON_HEX_TAG); ?>;
+                            if (latency > 0) {
+                                text += ' · ' + latency + 'ms';
+                            }
+                            result.textContent = text;
                             button.disabled = false;
                         })
                         .catch(function () {
