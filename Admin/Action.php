@@ -32,7 +32,7 @@ class Action extends Base implements ActionInterface
 
         $do = (string) $this->request->get('do', '');
 
-        if (in_array($do, ['save-advanced', 'clear-cache', 'set-trust', 'blacklist', 'history-scan', 'history-moderate'], true)
+        if (in_array($do, ['save-advanced', 'clear-cache', 'set-trust', 'blacklist', 'history-scan', 'history-moderate', 'models'], true)
             && !$this->request->isPost()) {
             $this->response->setStatus(405);
             return;
@@ -47,6 +47,9 @@ class Action extends Base implements ActionInterface
                 break;
             case 'test-connection':
                 $this->testConnection();
+                break;
+            case 'models':
+                $this->models();
                 break;
             case 'audit-info':
                 $this->auditInfo();
@@ -189,6 +192,21 @@ class Action extends Base implements ActionInterface
             $this->response->throwJson([
                 'success' => 0,
                 'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * 读取当前服务商的模型列表。
+     */
+    private function models()
+    {
+        try {
+            $this->response->throwJson(DeepSeekClient::listModels(Plugin::settings()));
+        } catch (\Throwable $e) {
+            $this->response->throwJson([
+                'success' => 0,
+                'message' => _t('获取模型列表失败，请检查服务地址和密钥。'),
             ]);
         }
     }

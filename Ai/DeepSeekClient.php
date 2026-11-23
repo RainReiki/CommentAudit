@@ -15,7 +15,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  */
 class DeepSeekClient
 {
-    private const USER_AGENT = 'CommentAudit/1.0.24 (+https://lizihao.com/)';
+    private const USER_AGENT = 'CommentAudit/1.0.25 (+https://lizihao.com/)';
 
     /**
      * 审核一条评论。
@@ -211,6 +211,123 @@ class DeepSeekClient
         self::recordSuccess();
 
         return $parsed;
+    }
+
+    /**
+     * 读取当前服务商支持的模型列表。
+     *
+     * @param array $settings
+     * @return array{success:int,models?:array,message?:string,endpoint?:string}
+     */
+    public static function listModels(array $settings): array
+    {
+        $apiKey = trim((string) ($settings['deepseekApiKey'] ?? ''));
+        if ($apiKey === '') {
+            return ['success' => 0, 'message' => _t('请先填写 API Key。')];
+        }
+
+        $baseUrl = self::normalizeBaseUrl((string) ($settings['deepseekBaseUrl'] ?? 'https://api.deepseek.com'));
+        $timeout = max(3, (int) ($settings['deepseekTimeout'] ?? 8));
+        $sslVerify = !empty($settings['deepseekSslVerify']);
+        $attempts = self::modelEndpoints($baseUrl);
+
+        $response = ['body' => '', 'error' => 'http_error', 'status' => 0];
+        $data = null;
+        $endpoint = '';
+        foreach ($attempts as $index => $candidate) {
+            $endpoint = $candidate;
+            $response = self::request($candidate, $apiKey, null, $timeout, $sslVerify);
+            if ($response['error'] === '') {
+                $data = self::decodeResponseBody($response['body']);
+                if (is_array($data)) {
+                    break;
+                }
+            }
+
+            $retryable = ($response['error'] === '' && $response['status'] < 400)
+                || in_array((int) $response['status'], [404, 405], true);
+            if (!$retryable || $index === count($attempts) - 1) {
+                break;
+            }
+        }
+
+        if ($response['error'] !== '') {
+            return ['success' => 0, 'message' => self::requestDiagnostic($response['status'], $response['error'])];
+        }
+
+        if (!is_array($data)) {
+            return ['success' => 0, 'message' => self::invalidResponseDiagnostic($response, $endpoint)];
+        }
+
+        if (isset($data['error'])) {
+            $message = self::errorMessage($data['error']);
+            return ['success' => 0, 'message' => $message !== ''
+                ? _t('审核服务返回错误：%s', self::short($message, 240))
+                : _t('审核服务拒绝了请求，请检查密钥和服务地址。')];
+        }
+
+        $models = self::extractModels($data);
+        if (!$models) {
+            return ['success' => 0, 'message' => _t('服务返回了 JSON，但没有找到模型列表。')];
+        }
+
+        return ['success' => 1, 'models' => $models, 'endpoint' => $endpoint];
+    }
+
+    /**
+     * @param string $baseUrl
+     * @return string[]
+     */
+    private static function modelEndpoints(string $baseUrl): array
+    {
+        $baseUrl = self::normalizeBaseUrl($baseUrl);
+        if (preg_match('#/chat/completions$#i', $baseUrl)) {
+            $baseUrl = preg_replace('#/chat/completions$#i', '', $baseUrl) ?? $baseUrl;
+        }
+        if (preg_match('#/v\d+(?:beta)?$#i', $baseUrl)) {
+            return [$baseUrl . '/models'];
+        }
+
+        $host = strtolower((string) parse_url($baseUrl, PHP_URL_HOST));
+        if ($host === 'api.deepseek.com') {
+            return [$baseUrl . '/models', $baseUrl . '/v1/models'];
+        }
+
+        return [$baseUrl . '/v1/models', $baseUrl . '/models'];
+    }
+
+    /**
+     * @param array $data
+     * @return string[]
+     */
+    private static function extractModels(array $data): array
+    {
+        $rows = $data['data'] ?? $data['models'] ?? null;
+        if (!is_array($rows)) {
+            return [];
+        }
+
+        $models = [];
+        foreach ($rows as $row) {
+            if (is_string($row)) {
+                $models[] = trim($row);
+                continue;
+            }
+            if (!is_array($row)) {
+                continue;
+            }
+            foreach (['id', 'name', 'model'] as $key) {
+                if (isset($row[$key]) && is_string($row[$key]) && trim($row[$key]) !== '') {
+                    $models[] = trim($row[$key]);
+                    break;
+                }
+            }
+        }
+
+        $models = array_values(array_unique(array_filter($models, static fn ($model) => $model !== '')));
+        sort($models, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return $models;
     }
 
     /**
@@ -492,14 +609,20 @@ class DeepSeekClient
      * @param bool $sslVerify
      * @return array{body:string,error:string,status:int}
      */
-    private static function request($endpoint, $apiKey, array $body, $timeout, $sslVerify = true)
+    private static function request($endpoint, $apiKey, ?array $body, $timeout, $sslVerify = true)
     {
-        $payload = json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
+        $payload = $body === null
+            ? ''
+            : json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
 
         if (function_exists('curl_init')) {
             $ch = curl_init($endpoint);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            if ($body === null) {
+                curl_setopt($ch, CURLOPT_HTTPGET, true);
+            } else {
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            }
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, min(5, $timeout));
             curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
@@ -544,7 +667,7 @@ class DeepSeekClient
 
         $context = stream_context_create([
             'http' => [
-                'method' => 'POST',
+                'method' => $body === null ? 'GET' : 'POST',
                 'header' => "Content-Type: application/json\r\nAccept: application/json\r\n"
                     . "Authorization: Bearer {$apiKey}\r\nUser-Agent: " . self::USER_AGENT . "\r\n",
                 'content' => $payload,

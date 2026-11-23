@@ -14,6 +14,7 @@ use Typecho\Widget\Helper\Form\Element\Text;
 use Typecho\Widget\Helper\Form\Element\Textarea;
 use Typecho\Widget\Helper\Layout;
 use TypechoPlugin\CommentAudit\Plugin;
+use Utils\Helper;
 use Widget\Options;
 
 if (!defined('__TYPECHO_ROOT_DIR__')) {
@@ -46,7 +47,7 @@ final class SettingsForm
                 'deepseekApiKey' => [Password::class, _t('API Key'), !$hasApiKey
                     ? _t('尚未配置。填写并保存后即可测试连接。')
                     : _t('已配置。可替换为新 Key，或清空后保存。')],
-                'deepseekModel' => [Text::class, _t('模型'), _t('默认 deepseek-flash。')],
+                'deepseekModel' => [Text::class, _t('模型'), _t('默认 deepseek-flash。不同服务商模型名不同，保存后可点击「获取模型列表」选择。')],
                 'deepseekBaseUrl' => [Text::class, _t('服务地址'), _t('默认 https://api.deepseek.com。可填根地址、.../v1 或完整 .../v1/chat/completions，插件会自动尝试补全 /v1。')],
                 'deepseekTimeout' => [Number::class, _t('请求超时（秒）'), _t('默认 8 秒。')],
                 'deepseekMaxTokens' => [Number::class, _t('最大 token 数'), _t('默认 1200。')],
@@ -97,6 +98,12 @@ final class SettingsForm
             $grid = new Layout('div', ['class' => 'commentaudit-config-grid']);
             foreach ($fields as $name => $field) {
                 $input = self::input($name, $settings[$name], $field);
+                if ($name === 'deepseekModel') {
+                    $input->input->setAttribute(
+                        'data-commentaudit-models',
+                        Helper::security()->getIndex('/action/comment-audit?do=models')
+                    );
+                }
                 $form->addInput($input);
                 $form->removeItem($input);
                 $grid->addItem($input);

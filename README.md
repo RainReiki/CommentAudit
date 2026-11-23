@@ -3,7 +3,7 @@
 > 作者：羽忆  
 > 作者站点：https://lizihao.com/  
 > 项目仓库：https://github.com/RainReiki/CommentAudit  
-> 当前版本：1.0.24<br>
+> 当前版本：1.0.25<br>
 > 发布日期：2026-11-23<br>
 > 适用环境：Typecho 1.3.x、PHP 8.0+、MySQL / MariaDB
 
@@ -253,7 +253,7 @@ API Key 每个字符显示为一个圆点。输入新 Key 后保存即可替换�
 
 ## 安装
 
-1. 下载并解压 [CommentAudit-1.0.24.zip](https://github.com/RainReiki/CommentAudit/releases/download/v1.0.24/CommentAudit-1.0.24.zip)；
+1. 下载并解压 [CommentAudit-1.0.25.zip](https://github.com/RainReiki/CommentAudit/releases/download/v1.0.25/CommentAudit-1.0.25.zip)；
 2. 解压后把 `CommentAudit` 目录放到：
 
 ```text
@@ -357,6 +357,11 @@ IP 黑名单应该来自你自己的垃圾评论日志，而不是从文章内�
 ---
 
 ## 更新记录
+
+### 1.0.25
+
+- **设置页可获取模型列表。** 保存服务地址和 API Key 后，点击模型字段下方的「获取模型列表」，插件会读取当前服务的 `/models` 或 `/v1/models`，把可用模型 ID 填入候选，解决官方与中转站模型名不一致的问题。
+- **兼容两种模型列表格式。** 支持 `data[].id` 和字符串数组，并在 `/v1/models` 与 `/models` 之间自动尝试。
 
 ### 1.0.24
 
@@ -478,7 +483,7 @@ https://github.com/RainReiki/CommentAudit/releases/latest
 插件包：
 
 ```text
-CommentAudit-1.0.24.zip
+CommentAudit-1.0.25.zip
 ```
 
 安装包内顶层目录为 `CommentAudit`，直接覆盖 `usr/plugins/CommentAudit` 即可。

@@ -63,3 +63,69 @@
         tablist.hidden = false;
     });
 })();
+
+(function () {
+    'use strict';
+
+    var input = document.querySelector('input[name="deepseekModel"][data-commentaudit-models]');
+    if (!input || !input.parentNode) return;
+
+    var url = input.getAttribute('data-commentaudit-models');
+    if (!url) return;
+
+    var tools = document.createElement('div');
+    tools.className = 'commentaudit-model-tools';
+    tools.style.marginTop = '8px';
+    tools.style.display = 'flex';
+    tools.style.alignItems = 'center';
+    tools.style.gap = '8px';
+    tools.style.flexWrap = 'wrap';
+
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn';
+    button.textContent = '获取模型列表';
+
+    var status = document.createElement('span');
+    status.className = 'commentaudit-muted';
+    status.setAttribute('role', 'status');
+    status.textContent = '保存设置后可获取列表';
+
+    var list = document.createElement('datalist');
+    list.id = 'commentaudit-model-list';
+    input.setAttribute('list', list.id);
+
+    tools.appendChild(button);
+    tools.appendChild(status);
+    tools.appendChild(list);
+    input.parentNode.insertBefore(tools, input.nextSibling);
+
+    button.addEventListener('click', function () {
+        button.disabled = true;
+        status.textContent = '获取中…';
+        fetch(url, { method: 'POST', credentials: 'same-origin' })
+            .then(function (response) { return response.json(); })
+            .then(function (data) {
+                if (!data || !data.success) {
+                    status.textContent = (data && data.message) || '获取失败，请检查服务地址和密钥';
+                    return;
+                }
+                var models = data.models || [];
+                list.innerHTML = '';
+                models.forEach(function (id) {
+                    var option = document.createElement('option');
+                    option.value = id;
+                    list.appendChild(option);
+                });
+                status.textContent = models.length
+                    ? '找到 ' + models.length + ' 个模型，点击输入框选择'
+                    : '没有找到模型';
+            })
+            .catch(function () {
+                status.textContent = '请求失败，请检查网络或登录状态';
+            })
+            .finally(function () {
+                button.disabled = false;
+            });
+    });
+})();
