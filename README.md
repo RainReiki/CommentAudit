@@ -9,6 +9,12 @@
 
 ---
 
+## 相关项目
+
+- [AICommentAudit](https://github.com/RainReiki/AICommentAudit)：同作者的 WordPress 版本，把这套「本地规则 + AI 审核」带到 WordPress，支持 WordPress 7.1.5、评论审核、身份检查、信誉、历史扫描和 API 令牌额度。如果你使用 WordPress，可以直接用这个版本；Typecho 版继续维护。
+
+---
+
 ## 为什么写这个插件
 
 独立博客的评论区很矛盾。
