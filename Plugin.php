@@ -19,6 +19,10 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
     exit;
 }
 
+// Acquire the request lock before other plugin classes can be autoloaded.
+require_once __DIR__ . '/Update/Guard.php';
+\TypechoPlugin\CommentAudit\Update\Guard::enter();
+
 /**
  * 评论审核插件
  *
@@ -27,12 +31,12 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  *
  * @package CommentAudit
  * @author 羽忆
- * @version 1.0.29
+ * @version 1.1.0
  * @link https://lizihao.com/
  */
 class Plugin implements PluginInterface
 {
-    public const VERSION = '1.0.29';
+    public const VERSION = '1.1.0';
     public const PLUGIN_NAME = 'CommentAudit';
 
     /**
@@ -49,6 +53,7 @@ class Plugin implements PluginInterface
      */
     public static function activate()
     {
+        Update\Guard::assertReady();
         self::installTables();
 
         // 只在首次启用时写入默认值，之后不覆盖后台设置。
@@ -83,6 +88,7 @@ class Plugin implements PluginInterface
      */
     public static function deactivate()
     {
+        Update\Guard::assertReady();
         Helper::removePanel(3, 'CommentAudit/panel.php');
         Helper::removeAction('comment-audit');
 
@@ -98,6 +104,7 @@ class Plugin implements PluginInterface
 
     public static function configHandle(array $settings, bool $isInit): void
     {
+        Update\Guard::assertReady();
         if (!$isInit) {
             // Typecho's form reader treats an empty string as a missing value.
             if (($_POST['deepseekApiKey'] ?? null) === '') {
@@ -132,6 +139,7 @@ class Plugin implements PluginInterface
      */
     public static function filterComment($comment, $content, $commentAgain = null)
     {
+        Update\Guard::assertReady();
         if (!is_array($comment)) {
             return $comment;
         }
@@ -336,6 +344,8 @@ class Plugin implements PluginInterface
             'ipRateLimit' => 5,
             'ipRateWindow' => 600,
             'linkLimit' => 3,
+            'englishRuleAction' => 'off',
+            'englishRatioThreshold' => 80,
             'deepseekApiKey' => '',
             'deepseekBaseUrl' => 'https://api.deepseek.com',
             'deepseekModel' => 'deepseek-flash',

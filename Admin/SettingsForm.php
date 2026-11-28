@@ -31,6 +31,7 @@ final class SettingsForm
         'ipRateLimit' => [0, null],
         'ipRateWindow' => [60, null],
         'linkLimit' => [0, null],
+        'englishRatioThreshold' => [1, 100, 'any'],
         'thresholdNew' => [0, 1, 'any'],
         'thresholdNormal' => [0, 1, 'any'],
         'thresholdTrusted' => [0, 1, 'any'],
@@ -77,6 +78,12 @@ final class SettingsForm
                 'ipBlacklist' => [Textarea::class, _t('IP 黑名单'), _t('每行一个 IP 或 CIDR，例如 192.0.2.0/24。')],
                 'emailBlacklist' => [Textarea::class, _t('邮箱黑名单'), _t('每行一个邮箱或域名，例如 *@example.com。')],
                 'urlBlacklist' => [Textarea::class, _t('网址黑名单'), _t('每行一个域名、通配子域名或 URL 前缀。')],
+            ]],
+            'language' => [_t('非中文评论'), _t('仅检查评论正文。无中文且英文字母占比达到阈值时触发，不影响含中文评论。'), [
+                'englishRuleAction' => [Radio::class, _t('命中后如何处理'), _t('默认关闭。继续 AI 审核会保留原有黑名单、频率限制和 AI 异常转待审策略。'), [
+                    'off' => _t('关闭'), 'reject' => _t('直接拒绝'), 'ai' => _t('继续 AI 审核'),
+                ]],
+                'englishRatioThreshold' => [Number::class, _t('英文占比阈值（%）'), _t('1–100，默认 80。英文字母 A–Z / a–z 数 ÷ 去掉空白后的正文字符数 × 100；数字、标点、表情计入分母，HTML 标签不计入。')],
             ]],
             'precheck' => [_t('频率与链接'), _t('在提交给 AI 之前检查同一 IP 的发评频率和评论中的链接数。'), [
                 'ipRateLimit' => [Number::class, _t('同一 IP 评论数上限'), _t('填 0 可关闭频率限制。')],
@@ -134,8 +141,9 @@ final class SettingsForm
             . $tabs . '</div>'
             . '<div class="commentaudit-config-links">'
             . '<a href="' . self::escape($advanced) . '">' . _t('高级设置与维护') . '</a>'
+            . '<a href="' . self::escape($options->adminUrl('extending.php?panel=CommentAudit%2Fpanel.php&tab=updates', true)) . '">' . _t('在线升级') . '</a>'
             . '<a href="https://github.com/RainReiki/CommentAudit" target="_blank" rel="noopener noreferrer">'
-            . _t('查看更新') . '</a></div></div>'
+            . _t('GitHub 发布页') . '</a></div></div>'
         ));
 
         // Typecho calls getInput() for every stored key, including ones managed elsewhere.
@@ -184,6 +192,11 @@ final class SettingsForm
         if (is_array($submitted['wordScopes'] ?? null)) {
             $scopes = array_filter($submitted['wordScopes'], 'is_string');
             $settings['wordScopes'] = array_values(array_intersect(self::SCOPES, $scopes));
+        }
+
+        $languageAction = $submitted['englishRuleAction'] ?? null;
+        if (in_array($languageAction, ['off', 'reject', 'ai'], true)) {
+            $settings['englishRuleAction'] = $languageAction;
         }
 
         $quotaPeriod = $submitted['quotaPeriod'] ?? null;

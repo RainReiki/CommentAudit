@@ -11,6 +11,24 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  */
 class LocalPrecheck
 {
+    /** Unicode code points, independent of mbstring. Markup is not visible text. */
+    public static function englishRule(string $text, array $settings): array
+    {
+        $text = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = preg_replace('/[\s\p{Z}]+/u', '', $text);
+        $action = $settings['englishRuleAction'] ?? 'off';
+        $threshold = (float) ($settings['englishRatioThreshold'] ?? 80);
+        if (!is_finite($threshold) || $threshold < 1 || $threshold > 100) {
+            $threshold = 80;
+        }
+        $total = is_string($text) ? preg_match_all('/./us', $text) : 0;
+        $english = $total ? preg_match_all('/[a-z]/i', $text) : 0;
+        $ratio = $total ? $english / $total * 100 : 0.0;
+        $matched = $total > 0 && $english > 0 && !preg_match('/\p{Han}/u', $text)
+            && $ratio >= $threshold && in_array($action, ['reject', 'ai'], true);
+        return ['matched' => $matched, 'action' => $action, 'ratio' => $ratio];
+    }
+
     /**
      * 统计正文中的链接数量。
      *

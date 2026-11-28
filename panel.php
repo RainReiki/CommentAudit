@@ -4,6 +4,7 @@ use TypechoPlugin\CommentAudit\Logger;
 use TypechoPlugin\CommentAudit\Plugin;
 use TypechoPlugin\CommentAudit\Repository;
 use TypechoPlugin\CommentAudit\Rule\WordFilter;
+use TypechoPlugin\CommentAudit\Update\Guard;
 use Widget\Options;
 
 if (!defined('__TYPECHO_ADMIN__')) {
@@ -23,9 +24,11 @@ $tabs = [
     'logs' => _t('审核日志'),
     'history' => _t('历史扫描'),
     'advanced' => _t('高级设置'),
+    'updates' => _t('在线升级'),
 ];
 $tab = $request->get('tab', 'overview');
 $tab = is_string($tab) && isset($tabs[$tab]) ? $tab : 'overview';
+if (Guard::pending()) { $tab = 'updates'; }
 
 $panelBase = 'extending.php?panel=' . urlencode('CommentAudit/panel.php');
 $pluginSettingsUrl = $options->adminUrl('options-plugin.php?config=CommentAudit', true);
@@ -65,6 +68,7 @@ require $adminPath . '/menu.php';
                         'logs' => _t('筛选历史审核记录并查看判定详情。'),
                         'history' => _t('用当前规则检查站内已有的评论，找出需要复核的内容。'),
                         'advanced' => _t('管理评论列表增强、日志保留和 AI 缓存。'),
+                        'updates' => _t('从 GitHub Releases 检查正式版本，仅更新差异文件。'),
                     ];
                     echo $h($intro[$tab]);
                 ?></p>
@@ -492,6 +496,8 @@ require $adminPath . '/menu.php';
 
         <?php elseif ($tab === 'history'): ?>
             <?php require __DIR__ . '/Admin/history-panel.php'; ?>
+        <?php elseif ($tab === 'updates'): ?>
+            <?php require __DIR__ . '/Admin/update-panel.php'; ?>
         <?php elseif ($tab === 'advanced'): ?>
             <form method="post" action="<?php echo $h($actionUrl('save-advanced')); ?>">
                 <div class="commentaudit-grid">

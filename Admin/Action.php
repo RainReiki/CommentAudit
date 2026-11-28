@@ -8,6 +8,8 @@ use TypechoPlugin\CommentAudit\Engine;
 use TypechoPlugin\CommentAudit\Logger;
 use TypechoPlugin\CommentAudit\Plugin;
 use TypechoPlugin\CommentAudit\Repository;
+use TypechoPlugin\CommentAudit\Update\Guard;
+use TypechoPlugin\CommentAudit\Update\Updater;
 use Utils\Helper;
 use Widget\ActionInterface;
 use Widget\Base;
@@ -32,11 +34,18 @@ class Action extends Base implements ActionInterface
 
         $do = (string) $this->request->get('do', '');
 
-        if (in_array($do, ['save-advanced', 'clear-cache', 'set-trust', 'blacklist', 'history-scan', 'history-moderate', 'models'], true)
+        if (in_array($do, ['save-advanced', 'clear-cache', 'set-trust', 'blacklist', 'history-scan', 'history-moderate', 'models', 'update-check', 'update-install', 'update-recover'], true)
             && !$this->request->isPost()) {
             $this->response->setStatus(405);
             return;
         }
+
+        if (in_array($do, ['update-check', 'update-install', 'update-recover'], true)) {
+            $this->updatePlugin($do);
+            return;
+        }
+        Guard::enter();
+        Guard::assertReady();
 
         switch ($do) {
             case 'save-advanced':
@@ -72,6 +81,25 @@ class Action extends Base implements ActionInterface
             default:
                 $this->back('overview');
         }
+    }
+
+    private function updatePlugin(string $operation): void
+    {
+        try {
+            Guard::recoveryRuntime();
+            $updater = new Updater(dirname(__DIR__));
+            if ($operation === 'update-install') {
+                $data = $updater->install((string) $this->request->get('version', ''));
+            } elseif ($operation === 'update-recover') {
+                $data = $updater->recover();
+            } else {
+                $data = $updater->check();
+            }
+            $result = ['success' => true, 'data' => $data];
+        } catch (\Throwable $error) {
+            $result = ['success' => false, 'message' => $error->getMessage()];
+        }
+        $this->response->throwJson($result);
     }
 
     private function scanHistory(): void

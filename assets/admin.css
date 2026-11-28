@@ -377,3 +377,29 @@ html:has(#darkcss:not([disabled])) :is(.commentaudit-scope, .commentaudit-enhanc
 .commentaudit-quota-meter.is-reached span {
     background: var(--ca-error);
 }
+
+.commentaudit-updater [hidden] { display: none !important; }
+.commentaudit-updater .commentaudit-actions { flex-wrap: wrap; }
+.commentaudit-update-status { min-height: 1.6em; white-space: pre-wrap; }
+.commentaudit-update-warning {
+    padding: 12px 14px;
+    border: 1px solid var(--ca-border);
+    border-radius: 8px;
+    background: var(--ca-warn);
+    color: var(--ca-text);
+}
+.commentaudit-updater details { margin-block: 12px; }
+.commentaudit-updater summary { cursor: pointer; color: var(--ca-accent); }
+.commentaudit-updater pre {
+    max-width: 100%;
+    max-height: 360px;
+    overflow: auto;
+    padding: 12px;
+    border: 1px solid var(--ca-border);
+    border-radius: 8px;
+    background: var(--ca-soft-bg);
+    color: var(--ca-text);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font: inherit;
+}

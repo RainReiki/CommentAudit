@@ -22,6 +22,7 @@ class Logger
      */
     public static function write(array $comment, array $result, $coid = 0)
     {
+        Update\Guard::assertReady();
         $db = Db::get();
         $ai = is_array($result['ai'] ?? null) ? $result['ai'] : [];
 
@@ -140,6 +141,8 @@ class Logger
             'local_email_blacklist' => '邮箱黑名单',
             'local_url_blacklist' => '网址黑名单',
             'local_block_word' => '明确违禁词',
+            'local_english_ratio' => '无中文且英文占比达到阈值',
+            'history_english_ai' => '英文规则命中，需要 AI 继续审核',
             'local_rate_limit' => '同一 IP 评论过于频繁',
             'local_duplicate' => '重复评论',
             'engine_error' => '审核引擎异常',

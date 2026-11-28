@@ -15,7 +15,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  */
 class DeepSeekClient
 {
-    private const USER_AGENT = 'CommentAudit/1.0.29 (+https://lizihao.com/)';
+    private const USER_AGENT = 'CommentAudit/1.1.0 (+https://lizihao.com/)';
 
     /**
      * 审核一条评论。

@@ -44,6 +44,7 @@ class Engine
         bool $withAi
     ): array
     {
+        Update\Guard::assertReady();
         $rawText = (string) ($comment['text'] ?? '');
         $text = WordFilter::normalize($rawText);
         $author = trim((string) ($comment['author'] ?? ''));
@@ -79,10 +80,22 @@ class Engine
             return self::reject('local_block_word', $trustLevel);
         }
 
+        $language = LocalPrecheck::englishRule($rawText, $settings);
+        if ($language['matched'] && $language['action'] === 'reject') {
+            return self::reject('local_english_ratio', $trustLevel, [], ['english_ratio']);
+        }
+
         // 2. 本地软标记
         $flags = LocalPrecheck::flags($comment, $settings, $trustLevel);
 
+        if ($language['matched']) {
+            $flags[] = 'english_ratio';
+        }
+
         if (!$withAi) {
+            if ($language['matched']) {
+                return self::waiting('history_english_ai', $trustLevel, [], $flags);
+            }
             if (in_array('suspect_word', $flags, true)) {
                 return self::waiting('history_suspect_word', $trustLevel);
             }

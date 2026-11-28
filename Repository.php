@@ -19,6 +19,8 @@ class Repository
      */
     private static function db()
     {
+        Update\Guard::enter();
+        Update\Guard::assertReady();
         return Db::get();
     }
 
